@@ -4,6 +4,22 @@
         Title="Progres lišta" Height="30" Width="800"
         WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False"
         Topmost="True" Background="#1E1F22" FontFamily="Segoe UI" FontSize="12">
+    <Window.Resources>
+        <!-- Jedna položka session; používá se v liště i v rozbalené záložce Hotovo. -->
+        <DataTemplate x:Key="SessionItem">
+            <Border Background="{Binding Background}" CornerRadius="4" Padding="6,2,8,2" Margin="0,0,6,4"
+                    ToolTip="{Binding Tooltip}" MouseRightButtonUp="Item_RightClick">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE718;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="11"
+                               Foreground="#EEE" Opacity="{Binding PinOpacity}" Cursor="Hand"
+                               VerticalAlignment="Center" Margin="0,0,6,0"
+                               ToolTip="Připnout / odepnout" MouseLeftButtonUp="Pin_Click"/>
+                    <Ellipse Width="8" Height="8" Fill="{Binding Dot}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Label}" Foreground="#EEE" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </Window.Resources>
     <DockPanel LastChildFill="True" Margin="8,0">
         <Button DockPanel.Dock="Right" Content="✕" Click="Close_Click" ToolTip="Zavřít lištu"
                 Background="Transparent" Foreground="#888" BorderThickness="0" Padding="8,0"/>
@@ -16,22 +32,26 @@
             <TextBlock x:Name="WeekText" Foreground="#DDD" Width="34" Margin="4,0,0,0" VerticalAlignment="Center"/>
         </StackPanel>
         <TextBlock x:Name="Summary" DockPanel.Dock="Left" Foreground="#DDD" FontWeight="SemiBold"
-                   VerticalAlignment="Center" Margin="0,0,16,0"/>
-        <ItemsControl x:Name="Items" VerticalAlignment="Center">
+                   VerticalAlignment="Center" Margin="0,0,12,0"/>
+        <Border x:Name="DoneChip" DockPanel.Dock="Left" Background="#14532D" CornerRadius="4" Padding="8,2"
+                Margin="0,0,12,0" VerticalAlignment="Center" Cursor="Hand"
+                ToolTip="Hotové nepřipnuté sessions (idle přes 10 min). Klik = seznam, pravý klik = vynulovat počítadlo."
+                MouseLeftButtonUp="DoneChip_Click" MouseRightButtonUp="DoneChip_RightClick">
+            <TextBlock x:Name="DoneText" Foreground="#EEE"/>
+        </Border>
+        <Popup x:Name="DonePopup" PlacementTarget="{Binding ElementName=DoneChip}" Placement="Bottom"
+               StaysOpen="False" AllowsTransparency="True">
+            <Border Background="#1E1F22" BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="4" Padding="6,6,0,2">
+                <ScrollViewer MaxHeight="400" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl x:Name="DoneItems" ItemTemplate="{StaticResource SessionItem}"/>
+                </ScrollViewer>
+            </Border>
+        </Popup>
+        <ItemsControl x:Name="Items" VerticalAlignment="Center" Margin="0,4,0,0"
+                      ItemTemplate="{StaticResource SessionItem}">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <Border Background="{Binding Background}" CornerRadius="4" Padding="8,2" Margin="0,0,6,0"
-                            ToolTip="{Binding Tooltip}" Cursor="Hand" MouseRightButtonUp="Item_RightClick">
-                        <StackPanel Orientation="Horizontal">
-                            <Ellipse Width="8" Height="8" Fill="{Binding Dot}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding Label}" Foreground="#EEE" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Border>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
         </ItemsControl>
     </DockPanel>
 </Window>

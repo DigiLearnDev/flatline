@@ -96,15 +96,49 @@ public partial class MainWindow : Window
         _attentionSeen.Clear();
         _attentionSeen.UnionWith(attention);
 
-        Items.ItemsSource = sessions
-            .OrderBy(s => s.Status.State switch { "attention" => 0, "running" => 1, _ => 2 })
+        foreach (var s in sessions) s.Pinned = _state.Pins.Contains(s.Status.Session_id);
+
+        // Nepřipnuté hotové sessions, které jsou idle přes 10 minut, jdou do záložky Hotovo.
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        bool InDone(SessionView s) => !s.Pinned && s.Status.State == "done" && now - s.Status.Updated > DoneAfterMs;
+        var doneTab = sessions.Where(InDone).OrderByDescending(s => s.Status.Updated).ToList();
+
+        Items.ItemsSource = sessions.Where(s => !InDone(s))
+            .OrderBy(s => s.Pinned ? 0 : 1)
+            .ThenBy(s => s.Status.State switch { "attention" => 0, "running" => 1, _ => 2 })
             .ThenBy(s => s.Status.Name)
             .ToList();
+        DoneItems.ItemsSource = doneTab;
+
+        // Počítadlo = kolik sessions do záložky spadlo od posledního vynulování.
+        int fresh = doneTab.Count(s => s.Status.Updated + DoneAfterMs > _state.CounterResetAt);
+        DoneText.Text = fresh > 0 ? $"Hotovo  {fresh}" : "Hotovo";
+        DoneChip.Opacity = doneTab.Count > 0 ? 1 : 0.5;
 
         int run = sessions.Count(s => s.Status.State == "running");
         int att = sessions.Count(s => s.Status.State == "attention");
-        int done = sessions.Count - run - att;
-        Summary.Text = $"Progres lišta  ·  běží {run}  ·  čeká {att}  ·  hotovo {done}";
+        Summary.Text = $"Progres lišta  ·  běží {run}  ·  čeká {att}";
+    }
+
+    private const long DoneAfterMs = 10 * 60 * 1000;
+    private readonly BarState _state = BarState.Load();
+
+    private void Pin_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is not SessionView v) return;
+        if (!_state.Pins.Remove(v.Status.Session_id)) _state.Pins.Add(v.Status.Session_id);
+        _state.Save();
+        e.Handled = true;
+        Reload();
+    }
+
+    private void DoneChip_Click(object sender, MouseButtonEventArgs e) => DonePopup.IsOpen = !DonePopup.IsOpen;
+
+    private void DoneChip_RightClick(object sender, MouseButtonEventArgs e)
+    {
+        _state.CounterResetAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        _state.Save();
+        Reload();
     }
 
     private void Item_RightClick(object sender, MouseButtonEventArgs e)
@@ -113,6 +147,8 @@ public partial class MainWindow : Window
         if (((FrameworkElement)sender).DataContext is SessionView v)
         {
             try { File.Delete(v.File); } catch { }
+            _state.Pins.Remove(v.Status.Session_id);
+            _state.Save();
         }
     }
 
@@ -145,6 +181,8 @@ public sealed class SessionView
 
     public SessionStatus Status { get; }
     public string File { get; }
+    public bool Pinned { get; set; }
+    public double PinOpacity => Pinned ? 1 : 0.25;
 
     public Brush Dot => Status.State switch { "running" => Blue, "attention" => Orange, _ => Green };
     public Brush Background => Status.State == "attention" ? AttentionBg : ItemBg;
