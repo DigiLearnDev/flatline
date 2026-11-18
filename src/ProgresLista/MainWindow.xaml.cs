@@ -42,6 +42,33 @@ public partial class MainWindow : Window
         _timer.Start();
 
         Reload();
+
+        var usageTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(3) };
+        usageTimer.Tick += async (_, _) => await RefreshUsage();
+        usageTimer.Start();
+        _ = RefreshUsage();
+    }
+
+    private async Task RefreshUsage()
+    {
+        var u = await UsageClient.FetchAsync();
+        Show(FiveBar, FiveText, u.FiveHour);
+        Show(WeekBar, WeekText, u.Week);
+        Usage.ToolTip = u.Error ?? $"5h: reset {Fmt(u.FiveHour)}\nTýden: reset {Fmt(u.Week)}";
+
+        static string Fmt(UsageWindow? w) => w?.ResetsAt?.ToLocalTime().ToString("ddd HH:mm") ?? "?";
+    }
+
+    private static void Show(System.Windows.Controls.ProgressBar bar, System.Windows.Controls.TextBlock text, UsageWindow? w)
+    {
+        bar.Value = w?.Percent ?? 0;
+        bar.Foreground = new SolidColorBrush(w?.Percent switch
+        {
+            >= 90 => Color.FromRgb(0xEF, 0x44, 0x44),
+            >= 70 => Color.FromRgb(0xF5, 0x9E, 0x0B),
+            _ => Color.FromRgb(0x3B, 0x82, 0xF6),
+        });
+        text.Text = w == null ? "?" : $"{w.Percent:0}%";
     }
 
     private void Reload()

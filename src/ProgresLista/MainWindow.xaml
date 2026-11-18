@@ -7,6 +7,14 @@
     <DockPanel LastChildFill="True" Margin="8,0">
         <Button DockPanel.Dock="Right" Content="✕" Click="Close_Click" ToolTip="Zavřít lištu"
                 Background="Transparent" Foreground="#888" BorderThickness="0" Padding="8,0"/>
+        <StackPanel x:Name="Usage" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
+            <TextBlock Text="5h" Foreground="#AAA" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <ProgressBar x:Name="FiveBar" Width="60" Height="6" Maximum="100" Background="#2B2D31" BorderThickness="0"/>
+            <TextBlock x:Name="FiveText" Foreground="#DDD" Width="34" Margin="4,0,12,0" VerticalAlignment="Center"/>
+            <TextBlock Text="týden" Foreground="#AAA" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <ProgressBar x:Name="WeekBar" Width="60" Height="6" Maximum="100" Background="#2B2D31" BorderThickness="0"/>
+            <TextBlock x:Name="WeekText" Foreground="#DDD" Width="34" Margin="4,0,0,0" VerticalAlignment="Center"/>
+        </StackPanel>
         <TextBlock x:Name="Summary" DockPanel.Dock="Left" Foreground="#DDD" FontWeight="SemiBold"
                    VerticalAlignment="Center" Margin="0,0,16,0"/>
         <ItemsControl x:Name="Items" VerticalAlignment="Center">
