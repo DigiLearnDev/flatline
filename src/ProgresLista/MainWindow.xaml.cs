@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private readonly FileSystemWatcher _watcher;
     private readonly DispatcherTimer _timer;
     private readonly HashSet<string> _attentionSeen = new();
+    private readonly TitleIndex _titles = new();
 
     public MainWindow()
     {
@@ -45,6 +46,7 @@ public partial class MainWindow : Window
 
     private void Reload()
     {
+        _titles.Refresh();
         var sessions = new List<SessionView>();
         foreach (var file in Directory.EnumerateFiles(StatusDir, "*.json"))
         {
@@ -52,7 +54,10 @@ public partial class MainWindow : Window
             {
                 var s = JsonSerializer.Deserialize<SessionStatus>(File.ReadAllText(file),
                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                if (s != null) sessions.Add(new SessionView(s, file));
+                if (s == null) continue;
+                // Ručně pojmenovaná session z levého panelu má přednost před názvem složky.
+                if (_titles.Lookup(s.Session_id) is { } title) s.Name = title;
+                sessions.Add(new SessionView(s, file));
             }
             catch { /* soubor se právě zapisuje, načte se při další změně */ }
         }
