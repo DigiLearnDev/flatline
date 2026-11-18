@@ -126,7 +126,7 @@ public partial class MainWindow : Window
 
         int run = sessions.Count(s => s.Status.State == "running");
         int att = sessions.Count(s => s.Status.State == "attention");
-        Summary.Text = $"Progres lišta  ·  běží {run}  ·  čeká {att}";
+        Summary.Text = $"běží {run}  ·  čeká {att}";
     }
 
     private const long DoneAfterMs = 10 * 60 * 1000;
