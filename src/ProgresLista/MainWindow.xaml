@@ -11,8 +11,8 @@
                     ToolTip="{Binding Tooltip}" Cursor="Hand"
                     MouseLeftButtonUp="Item_Click" MouseRightButtonUp="Item_RightClick">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="&#xE718;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="11"
-                               Foreground="{Binding Foreground}" Opacity="{Binding PinOpacity}" Cursor="Hand"
+                    <TextBlock Text="{Binding PinGlyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="11"
+                               Foreground="{Binding PinForeground}" Opacity="{Binding PinOpacity}" Cursor="Hand"
                                VerticalAlignment="Center" Margin="0,0,6,0"
                                ToolTip="Připnout / odepnout" MouseLeftButtonUp="Pin_Click"/>
                     <Ellipse Width="8" Height="8" Fill="{Binding Dot}" Margin="0,0,6,0" VerticalAlignment="Center"/>
