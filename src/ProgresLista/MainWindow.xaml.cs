@@ -218,8 +218,10 @@ public sealed class SessionView
     public string File { get; }
     public bool Pinned { get; set; }
     public double PinOpacity => Pinned ? 1 : 0.25;
-    // Připnutá = bíle vyplněný špendlík (PinnedFill), nepřipnutá = obrys (Pin).
-    public string PinGlyph => Pinned ? "" : "";
+    // Připnutá = bíle vyplněný špendlík: obrys Pinned (se špičkou) přes výplň PinnedFill.
+    // Nepřipnutá = jen obrys Pin.
+    public string PinGlyph => Pinned ? "" : "";
+    public string PinFillGlyph => Pinned ? "" : "";
     public Brush PinForeground => Pinned ? Brushes.White : Foreground;
 
     // Hotovo = modrý puntík jako v aplikaci Claude, běží = šedý.
