@@ -84,7 +84,7 @@ public partial class MainWindow : Window
                 if (s == null) continue;
                 // Ručně pojmenovaná session z levého panelu má přednost před názvem složky.
                 if (_titles.Lookup(s.Session_id) is { } title) s.Name = title;
-                sessions.Add(new SessionView(s, file));
+                sessions.Add(new SessionView(s, file) { AppLink = _titles.AppLink(s.Session_id) });
             }
             catch { /* soubor se právě zapisuje, načte se při další změně */ }
         }
@@ -95,6 +95,15 @@ public partial class MainWindow : Window
         if (attention.Except(_attentionSeen).Any()) SystemSounds.Exclamation.Play();
         _attentionSeen.Clear();
         _attentionSeen.UnionWith(attention);
+
+        // Krátké bliknutí lišty: když přibude nová session, nebo když existující přejde na hotovo
+        // či pozornost. Přechod existující session na „běží“ (šedá) a první načtení neblikají.
+        var states = sessions.ToDictionary(s => s.Status.Session_id, s => s.Status.State);
+        if (_lastStates != null && states.Any(kv => _lastStates.TryGetValue(kv.Key, out var old)
+                ? old != kv.Value && kv.Value != "running"
+                : true))
+            FlashBar();
+        _lastStates = states;
 
         foreach (var s in sessions) s.Pinned = _state.Pins.Contains(s.Status.Session_id);
 
@@ -122,6 +131,30 @@ public partial class MainWindow : Window
 
     private const long DoneAfterMs = 10 * 60 * 1000;
     private readonly BarState _state = BarState.Load();
+
+    private Dictionary<string, string>? _lastStates;
+
+    private void FlashBar()
+    {
+        var ease = new System.Windows.Media.Animation.SineEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseInOut };
+        var anim = new System.Windows.Media.Animation.DoubleAnimation(0, 0.35, TimeSpan.FromMilliseconds(150))
+        {
+            AutoReverse = true,
+            EasingFunction = ease,
+        };
+        Flash.BeginAnimation(OpacityProperty, anim);
+    }
+
+    private void Item_Click(object sender, MouseButtonEventArgs e)
+    {
+        // Otevře session v desktop aplikaci Claude (jen sessions, které tam existují).
+        if (((FrameworkElement)sender).DataContext is SessionView { AppLink: { } link })
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(link) { UseShellExecute = true }); }
+            catch { }
+            DonePopup.IsOpen = false;
+        }
+    }
 
     private void Pin_Click(object sender, MouseButtonEventArgs e)
     {
@@ -168,10 +201,15 @@ public sealed class SessionStatus
 public sealed class SessionView
 {
     private static readonly Brush Blue = Freeze(Color.FromRgb(0x3B, 0x82, 0xF6));
-    private static readonly Brush Orange = Freeze(Color.FromRgb(0xF5, 0x9E, 0x0B));
-    private static readonly Brush Green = Freeze(Color.FromRgb(0x22, 0xC5, 0x5E));
+    private static readonly Brush Gray = Freeze(Color.FromRgb(0xA1, 0xA1, 0xAA));
+    private static readonly Brush DarkOrange = Freeze(Color.FromRgb(0xC2, 0x41, 0x0C));
     private static readonly Brush ItemBg = Freeze(Color.FromRgb(0x2B, 0x2D, 0x31));
-    private static readonly Brush AttentionBg = Freeze(Color.FromRgb(0x7C, 0x4A, 0x03));
+    private static readonly Brush DoneBg = Freeze(Color.FromRgb(0x15, 0x80, 0x3D));
+    private static readonly Brush AttentionBg = Freeze(Color.FromRgb(0xEA, 0xB3, 0x08));
+    private static readonly Brush LightText = Freeze(Color.FromRgb(0xEE, 0xEE, 0xEE));
+    private static readonly Brush DarkText = Freeze(Color.FromRgb(0x1E, 0x1F, 0x22));
+
+    public string? AppLink { get; init; }
 
     public SessionView(SessionStatus status, string file)
     {
@@ -183,9 +221,16 @@ public sealed class SessionView
     public string File { get; }
     public bool Pinned { get; set; }
     public double PinOpacity => Pinned ? 1 : 0.25;
+    // Připnutá = bíle vyplněný špendlík: obrys Pinned (se špičkou) přes výplň PinnedFill.
+    // Nepřipnutá = jen obrys Pin.
+    public string PinGlyph => Pinned ? "" : "";
+    public string PinFillGlyph => Pinned ? "" : "";
+    public Brush PinForeground => Pinned ? Brushes.White : Foreground;
 
-    public Brush Dot => Status.State switch { "running" => Blue, "attention" => Orange, _ => Green };
-    public Brush Background => Status.State == "attention" ? AttentionBg : ItemBg;
+    // Hotovo = modrý puntík jako v aplikaci Claude, běží = šedý.
+    public Brush Dot => Status.State switch { "running" => Gray, "attention" => DarkOrange, _ => Blue };
+    public Brush Background => Status.State switch { "attention" => AttentionBg, "done" => DoneBg, _ => ItemBg };
+    public Brush Foreground => Status.State == "attention" ? DarkText : LightText;
 
     public string Label
     {

@@ -8,18 +8,24 @@
         <!-- Jedna položka session; používá se v liště i v rozbalené záložce Hotovo. -->
         <DataTemplate x:Key="SessionItem">
             <Border Background="{Binding Background}" CornerRadius="4" Padding="6,2,8,2" Margin="0,0,6,4"
-                    ToolTip="{Binding Tooltip}" MouseRightButtonUp="Item_RightClick">
+                    ToolTip="{Binding Tooltip}" Cursor="Hand"
+                    MouseLeftButtonUp="Item_Click" MouseRightButtonUp="Item_RightClick">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="&#xE718;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="11"
-                               Foreground="#EEE" Opacity="{Binding PinOpacity}" Cursor="Hand"
-                               VerticalAlignment="Center" Margin="0,0,6,0"
-                               ToolTip="Připnout / odepnout" MouseLeftButtonUp="Pin_Click"/>
+                    <!-- Vyplněný glyf nemá špičku, proto se pod obrys (se špičkou) kreslí výplň. -->
+                    <Grid Opacity="{Binding PinOpacity}" Cursor="Hand" VerticalAlignment="Center" Margin="0,0,6,0"
+                          Background="Transparent" ToolTip="Připnout / odepnout" MouseLeftButtonUp="Pin_Click">
+                        <TextBlock Text="{Binding PinFillGlyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   FontSize="11" Foreground="{Binding PinForeground}"/>
+                        <TextBlock Text="{Binding PinGlyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   FontSize="11" Foreground="{Binding PinForeground}"/>
+                    </Grid>
                     <Ellipse Width="8" Height="8" Fill="{Binding Dot}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding Label}" Foreground="#EEE" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Label}" Foreground="{Binding Foreground}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Border>
         </DataTemplate>
     </Window.Resources>
+    <Grid>
     <DockPanel LastChildFill="True" Margin="8,0">
         <Button DockPanel.Dock="Right" Content="✕" Click="Close_Click" ToolTip="Zavřít lištu"
                 Background="Transparent" Foreground="#888" BorderThickness="0" Padding="8,0"/>
@@ -54,4 +60,7 @@
             </ItemsControl.ItemsPanel>
         </ItemsControl>
     </DockPanel>
+    <!-- Bliknutí celé lišty při změně stavu (MainWindow.FlashBar). -->
+    <Border x:Name="Flash" Background="White" Opacity="0" IsHitTestVisible="False"/>
+    </Grid>
 </Window>

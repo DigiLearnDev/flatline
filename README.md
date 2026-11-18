@@ -11,7 +11,8 @@ Několik orchestračních agentů Claude zpracovává tickety z GitHubu. Větši
 ## Co umí
 
 - **Chová se jako hlavní panel Windows.** Lišta se registruje jako AppBar (`SHAppBarMessage`) a rezervuje si horních 30 px. Maximalizovaná okna končí pod ní a nic ji nepřekryje.
-- **Stav každé session:** 🔵 běží, 🟠 potřebuje pozornost (čeká na povolení nebo vstup, se zvukem), 🟢 hotovo. U každé je, jak dlouho v tom stavu je.
+- **Stav každé session:** šedý puntík běží, žlutá položka potřebuje pozornost (se zvukem), zelená položka s modrým puntíkem je hotová. Při každé změně stavu lišta krátce blikne.
+- **Klik na session** ji otevře v desktop aplikaci Claude (sessions z CLI odkaz nemají).
 - **Názvy z levého panelu** desktop aplikace Claude. Sessions z CLI mají název složky.
 - **Špendlík:** připnuté sessions jsou vždy vlevo a nikdy se neschovají.
 - **Záložka Hotovo:** sem spadnou nepřipnuté sessions hotové déle než 10 minut. Klik ukáže seznam, pravý klik vynuluje počítadlo.

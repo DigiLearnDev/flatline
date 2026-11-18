@@ -13,6 +13,12 @@ public sealed class TitleIndex
     private readonly Dictionary<string, (DateTime Stamp, string? Title, string[] CliIds)> _files = new();
     private readonly Dictionary<string, string> _titles = new();
 
+    private readonly Dictionary<string, string> _localIds = new();
+
+    /// <summary>Odkaz, který otevře session v desktop aplikaci Claude; null pro sessions z CLI.</summary>
+    public string? AppLink(string cliSessionId) =>
+        _localIds.TryGetValue(cliSessionId, out var l) ? "claude://claude.ai/epitaxy/" + l : null;
+
     public string? Lookup(string cliSessionId) =>
         _titles.TryGetValue(cliSessionId, out var t) ? t : null;
 
@@ -38,9 +44,14 @@ public sealed class TitleIndex
         foreach (var gone in _files.Keys.Where(k => !seen.Contains(k)).ToList()) _files.Remove(gone);
 
         _titles.Clear();
-        foreach (var (_, title, ids) in _files.Values)
-            if (!string.IsNullOrWhiteSpace(title))
-                foreach (var id in ids) _titles[id] = title;
+        _localIds.Clear();
+        foreach (var (file, (_, title, ids)) in _files)
+            foreach (var id in ids)
+            {
+                // Název souboru je ID session v desktop aplikaci (local_…), z něj vzniká odkaz.
+                _localIds[id] = Path.GetFileNameWithoutExtension(file);
+                if (!string.IsNullOrWhiteSpace(title)) _titles[id] = title;
+            }
     }
 
     private static string? ReadTitle(string file, out string[] cliIds)
