@@ -96,9 +96,12 @@ public partial class MainWindow : Window
         _attentionSeen.Clear();
         _attentionSeen.UnionWith(attention);
 
-        // Změna stavu kterékoli session = krátké bliknutí lišty (ne při prvním načtení).
+        // Krátké bliknutí lišty: když přibude nová session, nebo když existující přejde na hotovo
+        // či pozornost. Přechod existující session na „běží“ (šedá) a první načtení neblikají.
         var states = sessions.ToDictionary(s => s.Status.Session_id, s => s.Status.State);
-        if (_lastStates != null && states.Any(kv => _lastStates.TryGetValue(kv.Key, out var old) && old != kv.Value))
+        if (_lastStates != null && states.Any(kv => _lastStates.TryGetValue(kv.Key, out var old)
+                ? old != kv.Value && kv.Value != "running"
+                : true))
             FlashBar();
         _lastStates = states;
 
