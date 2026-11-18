@@ -1,4 +1,4 @@
-# Session Bar – vize
+# Progres lišta – vize
 
 ## Problém
 
