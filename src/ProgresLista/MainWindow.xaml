@@ -1,0 +1,29 @@
+﻿<Window x:Class="ProgresLista.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Progres lišta" Height="30" Width="800"
+        WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False"
+        Topmost="True" Background="#1E1F22" FontFamily="Segoe UI" FontSize="12">
+    <DockPanel LastChildFill="True" Margin="8,0">
+        <Button DockPanel.Dock="Right" Content="✕" Click="Close_Click" ToolTip="Zavřít lištu"
+                Background="Transparent" Foreground="#888" BorderThickness="0" Padding="8,0"/>
+        <TextBlock x:Name="Summary" DockPanel.Dock="Left" Foreground="#DDD" FontWeight="SemiBold"
+                   VerticalAlignment="Center" Margin="0,0,16,0"/>
+        <ItemsControl x:Name="Items" VerticalAlignment="Center">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Background="{Binding Background}" CornerRadius="4" Padding="8,2" Margin="0,0,6,0"
+                            ToolTip="{Binding Tooltip}" Cursor="Hand" MouseRightButtonUp="Item_RightClick">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="8" Height="8" Fill="{Binding Dot}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding Label}" Foreground="#EEE" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </DockPanel>
+</Window>

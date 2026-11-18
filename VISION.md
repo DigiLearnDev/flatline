@@ -26,3 +26,12 @@ Jednou očí mrknu nahoru a vím, jestli mám něco udělat.
 - Klik na položku přepne na danou session?
 - Zvukové nebo vizuální upozornění při stavu 🟠?
 - Technologie: C# (WPF/WinForms) jako první volba.
+
+## Prototyp – spuštění
+
+```
+node hooks/install.js
+dotnet run --project src/ProgresLista -c Release
+```
+
+`install.js` přidá hooky do `~/.claude/settings.json` (záloha `settings.json.bak-progres-lista`), `--remove` je odebere. Pravý klik na položku ji odebere z lišty.
