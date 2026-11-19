@@ -24,14 +24,14 @@
                     <Ellipse Width="8" Height="8" Fill="{Binding Dot}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding Label}" Foreground="{Binding Foreground}" VerticalAlignment="Center"/>
                 </StackPanel>
-                <!-- Zaplnění kontextu: celá šířka = limit (pravý klik na lištu). Odsazení drží čáru mimo zaoblené rohy. -->
-                <Grid VerticalAlignment="Bottom" Height="2" Margin="3,0" Visibility="{Binding ContextVisibility}"
-                      IsHitTestVisible="False">
+                <!-- Zaplnění kontextu: celá šířka = hranice kontextu (pravý klik na lištu). Odsazení drží čáru mimo zaoblené rohy. -->
+                <Grid VerticalAlignment="Bottom" Height="1" Margin="3,0" Visibility="{Binding ContextVisibility}"
+                      IsHitTestVisible="False" SnapsToDevicePixels="True" UseLayoutRounding="True">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="{Binding ContextFilled}"/>
                         <ColumnDefinition Width="{Binding ContextRest}"/>
                     </Grid.ColumnDefinitions>
-                    <Rectangle Fill="{Binding ContextBrush}" RadiusX="1" RadiusY="1"/>
+                    <Rectangle Fill="{Binding ContextBrush}"/>
                 </Grid>
                 </Grid>
             </Border>

@@ -19,12 +19,15 @@ public sealed class ContextMeter
         public long? Tokens;
     }
 
+    /// <summary>Výchozí hranice kontextu v tokenech.</summary>
+    public const long DefaultBoundary = 150_000;
+
     private readonly Dictionary<string, Cursor> _cursors = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Žlutá od limitu −10 %, červená až po jeho přesažení.</summary>
-    public static ContextLevel Level(long tokens, long limit) =>
-        tokens > limit ? ContextLevel.Over
-        : tokens * 10 >= limit * 9 ? ContextLevel.Warning
+    /// <summary>Žlutá od hranice kontextu −10 %, červená až po jejím přesažení.</summary>
+    public static ContextLevel Level(long tokens, long boundary) =>
+        tokens > boundary ? ContextLevel.Over
+        : tokens * 10 >= boundary * 9 ? ContextLevel.Warning
         : ContextLevel.Normal;
 
     /// <returns>Počet tokenů v kontextu, nebo null, když transkript chybí nebo v něm ještě není odpověď.</returns>

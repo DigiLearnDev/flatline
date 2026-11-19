@@ -88,8 +88,8 @@ public partial class MainWindow : Window
                 sessions.Add(new SessionView(s, file)
                 {
                     AppLink = _titles.AppLink(s.Session_id),
-                    ContextTokens = string.IsNullOrEmpty(s.Transcript) ? null : _context.Read(s.Transcript),
-                    ContextLimit = _state.ContextLimit,
+                    ContextTokens = TranscriptOf(s) is { } t ? _context.Read(t) : null,
+                    ContextBoundary = _state.ContextBoundary,
                 });
             }
             catch { /* soubor se právě zapisuje, načte se při další změně */ }
@@ -193,27 +193,43 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private static readonly long[] ContextLimits = { 100_000, 150_000, 200_000, 300_000, 500_000, 1_000_000 };
+    /// <summary>
+    /// Cesta k transkriptu session. Starší stavové soubory ji nemají (hook ji zapisuje až od zavedení
+    /// čáry kontextu), pak se odvodí z pracovní složky stejně jako u Claude Code: ~/.claude/projects/
+    /// &lt;cwd, kde je každý znak mimo písmena a číslice nahrazen pomlčkou&gt;/&lt;session_id&gt;.jsonl.
+    /// </summary>
+    private static string? TranscriptOf(SessionStatus s)
+    {
+        if (!string.IsNullOrEmpty(s.Transcript)) return s.Transcript;
+        if (string.IsNullOrEmpty(s.Cwd)) return null;
+        var dir = System.Text.RegularExpressions.Regex.Replace(s.Cwd, "[^A-Za-z0-9]", "-");
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".claude", "projects", dir, s.Session_id + ".jsonl");
+    }
+
+    private static readonly long[] ContextBoundaries = { 100_000, 150_000, 200_000, 300_000, 500_000, 1_000_000 };
 
     private void Bar_RightClick(object sender, MouseButtonEventArgs e)
     {
         // Jen volné místo lišty; položky a záložka Hotovo mají vlastní pravý klik, tlačítka ho ignorují.
         for (var d = e.OriginalSource as DependencyObject; d != null; d = VisualTreeHelper.GetParent(d))
             if (d is System.Windows.Controls.Primitives.ButtonBase) return;
+        // Rozbalená záložka Hotovo je v jiném okně (Popup), její události ale probublají sem.
+        if (e.OriginalSource is Visual v && PresentationSource.FromVisual(v)?.RootVisual != this) return;
 
         var menu = new System.Windows.Controls.ContextMenu();
         menu.Items.Add(new System.Windows.Controls.MenuItem { Header = "Plná čára kontextu při", IsEnabled = false });
-        foreach (var limit in ContextLimits)
+        foreach (var boundary in ContextBoundaries)
         {
             var item = new System.Windows.Controls.MenuItem
             {
-                Header = SessionView.FormatTokens(limit) + " tokenů",
+                Header = SessionView.FormatTokens(boundary) + " tokenů",
                 IsCheckable = true,
-                IsChecked = limit == _state.ContextLimit,
+                IsChecked = boundary == _state.ContextBoundary,
             };
             item.Click += (_, _) =>
             {
-                _state.ContextLimit = limit;
+                _state.ContextBoundary = boundary;
                 _state.Save();
                 Reload();
             };
@@ -256,10 +272,10 @@ public sealed class SessionView
 
     public string? AppLink { get; init; }
     public long? ContextTokens { get; init; }
-    public long ContextLimit { get; init; } = 150_000;
+    public long ContextBoundary { get; init; } = ContextMeter.DefaultBoundary;
 
-    // Zaplnění kontextu jako tenká čára na spodní hraně položky; plná šířka = limit.
-    private double ContextFraction => Math.Clamp((double)(ContextTokens ?? 0) / Math.Max(1, ContextLimit), 0, 1);
+    // Zaplnění kontextu jako tenká čára na spodní hraně položky; plná šířka = hranice kontextu.
+    private double ContextFraction => Math.Clamp((double)(ContextTokens ?? 0) / Math.Max(1, ContextBoundary), 0, 1);
     public GridLength ContextFilled => new(ContextFraction, GridUnitType.Star);
     public GridLength ContextRest => new(1 - ContextFraction, GridUnitType.Star);
     public Visibility ContextVisibility => ContextTokens is > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -269,7 +285,7 @@ public sealed class SessionView
         {
             // Na žluté položce (pozornost) by žlutá čára splynula, proto tmavší odstín.
             bool onYellow = Status.State == "attention";
-            return ContextMeter.Level(ContextTokens ?? 0, ContextLimit) switch
+            return ContextMeter.Level(ContextTokens ?? 0, ContextBoundary) switch
             {
                 ContextLevel.Over => LineRed,
                 ContextLevel.Warning => onYellow ? LineYellowOnYellow : LineYellow,
@@ -316,7 +332,7 @@ public sealed class SessionView
         {
             var state = Status.State switch { "running" => "běží", "attention" => "potřebuje pozornost", _ => "hotovo" };
             var msg = string.IsNullOrEmpty(Status.Message) ? "" : "\n" + Status.Message;
-            var ctx = ContextTokens is { } t ? $"\nkontext {FormatTokens(t)} / {FormatTokens(ContextLimit)}" : "";
+            var ctx = ContextTokens is long t and > 0 ? $"\nkontext {FormatTokens(t)} / {FormatTokens(ContextBoundary)}" : "";
             return $"{state}{ctx}\n{Status.Cwd}{msg}\n(pravý klik = odebrat)";
         }
     }

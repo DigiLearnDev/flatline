@@ -72,10 +72,10 @@ public sealed class ContextMeterTests
     [TestMethod]
     [DataRow(0L, ContextLevel.Normal)]
     [DataRow(134_999L, ContextLevel.Normal)]
-    [DataRow(135_000L, ContextLevel.Warning)]   // limit − 10 %
-    [DataRow(150_000L, ContextLevel.Warning)]   // dosažení limitu ještě není přesah
+    [DataRow(135_000L, ContextLevel.Warning)]   // hranice − 10 %
+    [DataRow(150_000L, ContextLevel.Warning)]   // dosažení hranice ještě není přesah
     [DataRow(150_001L, ContextLevel.Over)]
-    public void Line_turns_yellow_at_limit_minus_ten_percent_and_red_above_limit(long tokens, ContextLevel expected)
+    public void Line_turns_yellow_at_boundary_minus_ten_percent_and_red_above_boundary(long tokens, ContextLevel expected)
     {
         Assert.AreEqual(expected, ContextMeter.Level(tokens, 150_000));
     }
