@@ -16,6 +16,7 @@ $Light = [Drawing.Color]::FromArgb(0xF4, 0xF4, 0xF5)
 $Dark = [Drawing.Color]::FromArgb(0x1E, 0x1F, 0x22)
 $Yellow = [Drawing.Color]::FromArgb(0xEA, 0xB3, 0x08)   # potřebuje pozornost
 $Blue = [Drawing.Color]::FromArgb(0x3B, 0x82, 0xF6)     # hotovo
+$Gray = [Drawing.Color]::FromArgb(0xA1, 0xA1, 0xAA)     # běží
 $TileTop = [Drawing.Color]::FromArgb(0x2B, 0x2D, 0x31)
 $TileBottom = [Drawing.Color]::FromArgb(0x1E, 0x1F, 0x22)
 
@@ -24,11 +25,11 @@ $base = 240
 $cx = 262; $cy = 165; $r = 75; $k = 14
 
 $line = New-Object Drawing.Drawing2D.GraphicsPath
-$line.AddLines([Drawing.PointF[]]@((P 70 $base), (P 118 172), (P 166 $base), (P 262 $base)))
+# „A“ je vysoká stříška bez příčky, špička ve výšce teček.
+$line.AddLines([Drawing.PointF[]]@((P 80 $base), (P 124 82), (P 168 $base), (P 262 $base)))
 $line.StartFigure()
-$line.AddLines([Drawing.PointF[]]@((P 262 $base), (P 400 $base), (P 400 178)))
-$line.StartFigure()
-$line.AddLine((P 96 210), (P 140 210))   # příčka „A“
+# Dřík „i“ končí pod šedým puntíkem, který mu slouží jako tečka.
+$line.AddLines([Drawing.PointF[]]@((P 262 $base), (P 400 $base), (P 400 150)))
 $line.StartFigure()
 $line.AddBeziers([Drawing.PointF[]]@(
     (P $cx ($cy + $r)), (P ($cx - $k) ($cy + $k)), (P ($cx - $k) ($cy + $k)), (P ($cx - $r) $cy),
@@ -39,12 +40,13 @@ $line.AddBeziers([Drawing.PointF[]]@(
 $line.CloseFigure()
 
 # Kolečka: x, y, poloměr, barva (null = barva kresby).
+# Tři puntíky stavů v jedné řadě; jejich vrch lícuje se špičkou hvězdy.
 $dots = @(
-    @(400, 138, 13, $null),     # tečka nad „i“
     @(196, 104, 23, $Yellow),   # potřebuje pozornost
-    @(332, 104, 23, $Blue)      # hotovo
+    @(332, 104, 23, $Blue),     # hotovo
+    @(400, 104, 23, $Gray)      # běží; zároveň tečka nad „i“
 )
-$markBounds = New-Object Drawing.RectangleF 52, 72, 366, 186   # značka včetně tloušťky čáry
+$markBounds = New-Object Drawing.RectangleF 68, 70, 357, 179   # značka včetně tloušťky čáry
 
 function Draw-Mark($g, [Drawing.Color]$ink, [single]$stroke) {
     $pen = New-Object Drawing.Pen $ink, $stroke
