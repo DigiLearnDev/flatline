@@ -1,8 +1,8 @@
-# Progres lišta
+# FlatLine
 
 Tenká lišta na horním okraji obrazovky Windows, která ukazuje stav všech běžících sessions Claude Code a vyčerpání 5h a týdenního limitu. Stačí mrknout nahoru a vím, jestli po mně některý agent něco chce.
 
-![Progres lišta](docs/screenshot.png)
+![FlatLine](docs/screenshot.png)
 
 ## Proč
 
@@ -28,7 +28,7 @@ Potřebuješ Windows 10/11, [.NET 9 Desktop Runtime](https://dotnet.microsoft.co
    ```
    node hooks/install.js
    ```
-3. Spusť `ProgresLista.exe`.
+3. Spusť `FlatLine.exe`.
 4. Pro ukazatele limitů se jednou přihlas v CLI: `claude` → `/login`.
 
 Odinstalace hooků: `node hooks/install.js --remove`.

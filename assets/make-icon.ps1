@@ -1,4 +1,4 @@
-# Vykreslí ikonu Semafor (ležatý semafor: šedá = běží, žlutá = čeká, zelená = hotovo)
+# Vykreslí ikonu FlatLine (ležatý semafor: šedá = běží, žlutá = čeká, zelená = hotovo)
 # do assets/icon.ico ve velikostech 16, 24, 32, 48, 64 a 256 px.
 # Použití: powershell -NoProfile -File assets/make-icon.ps1
 Add-Type -AssemblyName System.Drawing
