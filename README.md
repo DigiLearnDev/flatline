@@ -21,6 +21,7 @@ Několik orchestračních agentů Claude zpracovává tickety z GitHubu. Větši
 - **Názvy z levého panelu** desktop aplikace Claude. Sessions z CLI mají název složky.
 - **Špendlík:** připnuté sessions jsou vždy vlevo a nikdy se neschovají.
 - **Záložka Hotovo:** sem spadnou nepřipnuté sessions hotové déle než 10 minut. Klik ukáže seznam, pravý klik vynuluje počítadlo.
+- **Zaplnění kontextu:** tenká čára na spodní hraně položky. Plná čára = hranice kontextu (výchozí 150k tokenů), od hranice −10 % je žlutá, nad hranicí červená. Hranici změníš pravým klikem na volné místo lišty. Přesný počet je v tooltipu.
 - **Limity:** ukazatele 5h a týdenního okna, modré / od 70 % oranžové / od 90 % červené.
 - Pravý klik na session ji odebere z lišty (např. když skončila bez `SessionEnd`).
 
@@ -43,12 +44,14 @@ Odinstalace hooků: `node hooks/install.js --remove`.
 - Hooky Claude Code (`hooks/progres-hook.js`) zapisují stav každé session do `~/.claude/progres-lista/<session_id>.json`. Lišta složku sleduje.
 - Názvy čte z metadat desktop aplikace v `%LOCALAPPDATA%\Claude-Data`. Není to veřejné rozhraní, po aktualizaci aplikace se může změnit; lišta pak ukáže název složky.
 - Limity čte z `api.anthropic.com/api/oauth/usage` tokenem z `~/.claude/.credentials.json`. Prošlý token obnoví a uloží zpět. Token jde jen na Anthropic.
-- Připnutí a počítadlo jsou v `~/.claude/progres-lista-state.json`.
+- Zaplnění kontextu čte z transkriptu session (`~/.claude/projects/…/<session_id>.jsonl`), jehož cestu zapisuje hook. Čte jen nové řádky. Formát transkriptu není veřejné rozhraní; když se změní, čára se neukáže.
+- Připnutí, počítadlo a hranice kontextu jsou v `~/.claude/progres-lista-state.json`.
 
 ## Vývoj
 
 ```
 dotnet build src/ProgresLista -c Release
+dotnet test tests/FlatLine.Tests
 ```
 
 Příspěvky zvenku nepřijímám, viz [CONTRIBUTING.md](CONTRIBUTING.md).

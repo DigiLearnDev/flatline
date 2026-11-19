@@ -3,14 +3,16 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="FlatLine" Height="30" Width="800"
         WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False"
-        Topmost="True" Background="#1E1F22" FontFamily="Segoe UI" FontSize="12">
+        Topmost="True" Background="#1E1F22" FontFamily="Segoe UI" FontSize="12"
+        MouseRightButtonUp="Bar_RightClick">
     <Window.Resources>
         <!-- Jedna položka session; používá se v liště i v rozbalené záložce Hotovo. -->
         <DataTemplate x:Key="SessionItem">
-            <Border Background="{Binding Background}" CornerRadius="4" Padding="6,2,8,2" Margin="0,0,6,4"
+            <Border Background="{Binding Background}" CornerRadius="4" Margin="0,0,6,4"
                     ToolTip="{Binding Tooltip}" Cursor="Hand"
                     MouseLeftButtonUp="Item_Click" MouseRightButtonUp="Item_RightClick">
-                <StackPanel Orientation="Horizontal">
+                <Grid>
+                <StackPanel Orientation="Horizontal" Margin="6,2,8,2">
                     <!-- Vyplněný glyf nemá špičku, proto se pod obrys (se špičkou) kreslí výplň. -->
                     <Grid Opacity="{Binding PinOpacity}" Cursor="Hand" VerticalAlignment="Center" Margin="0,0,6,0"
                           Background="Transparent" ToolTip="Připnout / odepnout" MouseLeftButtonUp="Pin_Click">
@@ -22,6 +24,16 @@
                     <Ellipse Width="8" Height="8" Fill="{Binding Dot}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding Label}" Foreground="{Binding Foreground}" VerticalAlignment="Center"/>
                 </StackPanel>
+                <!-- Zaplnění kontextu: celá šířka = hranice kontextu (pravý klik na lištu). Odsazení drží čáru mimo zaoblené rohy. -->
+                <Grid VerticalAlignment="Bottom" Height="1" Margin="3,0" Visibility="{Binding ContextVisibility}"
+                      IsHitTestVisible="False" SnapsToDevicePixels="True" UseLayoutRounding="True">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="{Binding ContextFilled}"/>
+                        <ColumnDefinition Width="{Binding ContextRest}"/>
+                    </Grid.ColumnDefinitions>
+                    <Rectangle Fill="{Binding ContextBrush}"/>
+                </Grid>
+                </Grid>
             </Border>
         </DataTemplate>
     </Window.Resources>

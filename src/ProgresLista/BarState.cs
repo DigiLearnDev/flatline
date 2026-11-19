@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace ProgresLista;
 
 /// <summary>
-/// Trvalý stav lišty: připnuté sessions a čas posledního vynulování počítadla Hotovo.
+/// Trvalý stav lišty: připnuté sessions, čas posledního vynulování počítadla Hotovo a hranice kontextu.
 /// Leží vedle složky se stavy sessions, aby ho lišta nečetla jako session.
 /// </summary>
 public sealed class BarState
@@ -14,6 +14,8 @@ public sealed class BarState
 
     public HashSet<string> Pins { get; set; } = new();
     public long CounterResetAt { get; set; }
+    /// <summary>Počet tokenů, při kterém je čára zaplnění kontextu plná; nad ním zčervená.</summary>
+    public long ContextBoundary { get; set; } = ContextMeter.DefaultBoundary;
 
     public static BarState Load()
     {

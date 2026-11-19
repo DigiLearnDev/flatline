@@ -38,6 +38,8 @@ process.stdin.on("end", () => {
       session_id: id,
       name: path.basename(cwd) || id.slice(0, 8),
       cwd,
+      // Transkript session; lišta z něj čte zaplnění kontextu.
+      transcript: input.transcript_path || prev.transcript || "",
       state,
       message: state === "attention" ? message : "",
       updated: Date.now(),
