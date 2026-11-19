@@ -59,19 +59,25 @@ function Draw-Mark($g, [Drawing.Color]$ink, [single]$stroke) {
 }
 
 # --- Nadpis pod značkou, vystředěný ---
-$family = New-Object Drawing.FontFamily 'Segoe UI Semibold'
+$family = New-Object Drawing.FontFamily 'Segoe Script'   # psací písmo, tučný řez sedí k tloušťce čáry značky
 $title = New-Object Drawing.Drawing2D.GraphicsPath
-$title.AddString('FlatLine', $family, 0, 110, (P 0 0), [Drawing.StringFormat]::GenericTypographic)
+$title.FillMode = 'Winding'   # tahy psacího písma se překrývají; Alternate by v nich dělal mezery
+$title.AddString('FlatLine', $family, 1, 100, (P 0 0), [Drawing.StringFormat]::GenericTypographic)
 $tb = $title.GetBounds()
 $m = New-Object Drawing.Drawing2D.Matrix
 $m.Translate([single]($markBounds.X + $markBounds.Width / 2 - $tb.X - $tb.Width / 2), [single]($markBounds.Bottom + 34 - $tb.Y))
 $title.Transform($m)
 $tb = $title.GetBounds()
+$tb.Inflate(4, 4)   # obtažení písma
 $logoBounds = [Drawing.RectangleF]::Union($markBounds, $tb)
 
 function Draw-Logo($g, [Drawing.Color]$ink) {
     Draw-Mark $g $ink 18
     $g.FillPath((New-Object Drawing.SolidBrush $ink), $title)
+    # Obtažení zesílí tah písma, aby seděl k čáře značky.
+    $pen = New-Object Drawing.Pen $ink, 6
+    $pen.LineJoin = 'Round'
+    $g.DrawPath($pen, $title)
 }
 
 # Vykreslí obsah tak, aby obdélník $src vyplnil $fill podílu plátna a byl vystředěný.
