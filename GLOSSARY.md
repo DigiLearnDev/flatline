@@ -1,4 +1,4 @@
-# Progres lišta
+# FlatLine
 
 Lišta na horním okraji obrazovky, která na první pohled ukazuje, jestli některá session Claude běží, je hotová nebo po mně něco chce, a kolik zbývá z limitů.
 

@@ -1,4 +1,4 @@
-// Přidá hooky Progres lišty do ~/.claude/settings.json (idempotentně, se zálohou).
+// Přidá hooky FlatLine do ~/.claude/settings.json (idempotentně, se zálohou).
 // Použití: node hooks/install.js        (odinstalace: node hooks/install.js --remove)
 const fs = require("fs");
 const os = require("os");
@@ -21,7 +21,7 @@ const settings = fs.existsSync(settingsPath) ? JSON.parse(fs.readFileSync(settin
 fs.copyFileSync(settingsPath, settingsPath + ".bak-progres-lista");
 settings.hooks = settings.hooks || {};
 
-// Nejdřív odstraní staré záznamy Progres lišty.
+// Nejdřív odstraní staré záznamy FlatLine.
 for (const ev of Object.keys(settings.hooks)) {
   settings.hooks[ev] = settings.hooks[ev]
     .map((g) => ({ ...g, hooks: (g.hooks || []).filter((h) => !String(h.command).includes(MARK)) }))

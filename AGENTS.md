@@ -1,10 +1,10 @@
-# Progres lišta
+# FlatLine
 
 Windows AppBar (C#, WPF, .NET 9) ukazující stav sessions Claude Code a 5h/týdenní limity. Popis a instalace: `README.md`.
 
 ## Příkazy
 
-- `dotnet build src/ProgresLista -c Release` – sestavení. Běžící `ProgresLista.exe` drží soubory v `bin/`, před buildem ho ukonči (`taskkill /IM ProgresLista.exe /F`).
+- `dotnet build src/ProgresLista -c Release` – sestavení. Běžící `FlatLine.exe` drží soubory v `bin/`, před buildem ho ukonči (`taskkill /IM FlatLine.exe /F`).
 - `node hooks/install.js` / `--remove` – přidá / odebere hooky v `~/.claude/settings.json`.
 
 ## Struktura
@@ -20,7 +20,7 @@ Windows AppBar (C#, WPF, .NET 9) ukazující stav sessions Claude Code a 5h/týd
 
 ### Issue tracker
 
-Issues a specifikace jsou v GitHub Issues repa `DigiLearnDev/progres-lista` (přes `gh`). See `docs/agents/issue-tracker.md`.
+Issues a specifikace jsou v GitHub Issues repa `DigiLearnDev/flatline` (přes `gh`). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
