@@ -1,4 +1,9 @@
-# FlatLine
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png">
+    <img src="assets/logo-light.png" alt="FlatLine" height="72">
+  </picture>
+</h1>
 
 Tenká lišta na horním okraji obrazovky Windows, která ukazuje stav všech běžících sessions Claude Code a vyčerpání 5h a týdenního limitu. Stačí mrknout nahoru a vím, jestli po mně některý agent něco chce.
 
