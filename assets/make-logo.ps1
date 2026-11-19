@@ -1,87 +1,148 @@
-# Vykreslí logo FlatLine: značku „A✦i“ a vedle ní nápis.
-# Značka je jedna plochá čára (flatline): zleva vyskočí „A“, uprostřed se zvedne
-# do čtyřcípé AI hvězdy jako tep na EKG a vpravo skončí písmenem „i“.
-# Výstup: assets/logo-dark.png (světlé pro tmavé pozadí), assets/logo-light.png
-# a samotná značka assets/mark-dark.png, assets/mark-light.png.
+# Vykreslí logo a ikonu FlatLine.
+# Značka je jedna plochá čára (flatline): zleva vyskočí „A“, uprostřed se zvedne do čtyřcípé
+# AI hvězdy jako tep na EKG a vpravo skončí písmenem „i“. Nad hvězdou jsou dvě tečky v barvách
+# stavů: žlutá = potřebuje pozornost, modrá = hotovo. Nadpis FlatLine je pod značkou.
+#
+# Výstup do assets/:
+#   logo-dark.png, logo-light.png  značka + nadpis, průhledné pozadí (světlá / tmavá kresba)
+#   tile.png                       dlaždice ve stylu Microsoftu se značkou a nadpisem (512 px)
+#   icon.png, icon.ico             dlaždice jen se značkou, ikona aplikace (16–256 px)
 # Použití: powershell -NoProfile -File assets/make-logo.ps1
 Add-Type -AssemblyName System.Drawing
 
 function P([single]$x, [single]$y) { New-Object Drawing.PointF $x, $y }
 
-$base = 240        # výška ploché čáry
-$stroke = 18
+$Light = [Drawing.Color]::FromArgb(0xF4, 0xF4, 0xF5)
+$Dark = [Drawing.Color]::FromArgb(0x1E, 0x1F, 0x22)
+$Yellow = [Drawing.Color]::FromArgb(0xEA, 0xB3, 0x08)   # potřebuje pozornost
+$Blue = [Drawing.Color]::FromArgb(0x3B, 0x82, 0xF6)     # hotovo
+$TileTop = [Drawing.Color]::FromArgb(0x2B, 0x2D, 0x31)
+$TileBottom = [Drawing.Color]::FromArgb(0x1E, 0x1F, 0x22)
 
-# --- Značka (souřadnice podle skici) ---
+# --- Značka v souřadnicích skici ---
+$base = 240
+$cx = 262; $cy = 165; $r = 75; $k = 14
 
-# Čára: A, rovně k hvězdě, za hvězdou rovně k „i“ a nahoru do jeho dříku.
 $line = New-Object Drawing.Drawing2D.GraphicsPath
 $line.AddLines([Drawing.PointF[]]@((P 70 $base), (P 118 172), (P 166 $base), (P 262 $base)))
 $line.StartFigure()
 $line.AddLines([Drawing.PointF[]]@((P 262 $base), (P 400 $base), (P 400 178)))
-$crossbar = New-Object Drawing.Drawing2D.GraphicsPath
-$crossbar.AddLine((P 96 210), (P 140 210))
-
-# Hvězda: dolní cíp sedí na čáře. Prohnuté strany = Bézierovy křivky s řídicími body u středu.
-$cx = 262; $cy = 165; $r = 75; $k = 14
-$star = New-Object Drawing.Drawing2D.GraphicsPath
-$star.AddBeziers([Drawing.PointF[]]@(
+$line.StartFigure()
+$line.AddLine((P 96 210), (P 140 210))   # příčka „A“
+$line.StartFigure()
+$line.AddBeziers([Drawing.PointF[]]@(
     (P $cx ($cy + $r)), (P ($cx - $k) ($cy + $k)), (P ($cx - $k) ($cy + $k)), (P ($cx - $r) $cy),
     (P ($cx - $k) ($cy - $k)), (P ($cx - $k) ($cy - $k)), (P $cx ($cy - $r)),
     (P ($cx + $k) ($cy - $k)), (P ($cx + $k) ($cy - $k)), (P ($cx + $r) $cy),
     (P ($cx + $k) ($cy + $k)), (P ($cx + $k) ($cy + $k)), (P $cx ($cy + $r))
 ))
-$star.CloseFigure()
+$line.CloseFigure()
 
-$dot = @(400, 138, 13)   # tečka nad „i“: x, y, poloměr
+# Kolečka: x, y, poloměr, barva (null = barva kresby).
+$dots = @(
+    @(400, 138, 13, $null),     # tečka nad „i“
+    @(196, 104, 23, $Yellow),   # potřebuje pozornost
+    @(332, 104, 23, $Blue)      # hotovo
+)
+$markBounds = New-Object Drawing.RectangleF 52, 72, 366, 186   # značka včetně tloušťky čáry
 
-function Draw-Mark($g, [Drawing.Color]$ink) {
+function Draw-Mark($g, [Drawing.Color]$ink, [single]$stroke) {
     $pen = New-Object Drawing.Pen $ink, $stroke
     $pen.StartCap = 'Round'; $pen.EndCap = 'Round'; $pen.LineJoin = 'Round'
     $g.DrawPath($pen, $line)
-    $g.DrawPath($pen, $crossbar)
-    $g.FillEllipse((New-Object Drawing.SolidBrush $ink), [single]($dot[0] - $dot[2]), [single]($dot[1] - $dot[2]), [single](2 * $dot[2]), [single](2 * $dot[2]))
-
-    $grad = New-Object Drawing.Drawing2D.LinearGradientBrush (P ($cx - $r) ($cy - $r)), (P ($cx + $r) ($cy + $r)), ([Drawing.Color]::Blue), ([Drawing.Color]::Red)
-    $blend = New-Object Drawing.Drawing2D.ColorBlend 3
-    $blend.Colors = @([Drawing.Color]::FromArgb(0x42, 0x85, 0xF4), [Drawing.Color]::FromArgb(0x9B, 0x72, 0xCB), [Drawing.Color]::FromArgb(0xD9, 0x65, 0x70))
-    $blend.Positions = @(0.0, 0.5, 1.0)
-    $grad.InterpolationColors = $blend
-    $spen = New-Object Drawing.Pen $grad, $stroke
-    $spen.LineJoin = 'Round'
-    $g.DrawPath($spen, $star)
+    foreach ($d in $dots) {
+        $c = if ($d[3]) { $d[3] } else { $ink }
+        $g.FillEllipse((New-Object Drawing.SolidBrush $c), [single]($d[0] - $d[2]), [single]($d[1] - $d[2]), [single](2 * $d[2]), [single](2 * $d[2]))
+    }
 }
 
-# --- Nápis, účaří zarovnané s plochou čárou ---
-$em = 190
+# --- Nadpis pod značkou, vystředěný ---
 $family = New-Object Drawing.FontFamily 'Segoe UI Semibold'
-$ascent = $family.GetCellAscent([Drawing.FontStyle]::Regular) / $family.GetEmHeight([Drawing.FontStyle]::Regular) * $em
-$textX = 470
-$word = New-Object Drawing.Drawing2D.GraphicsPath
-$word.AddString('FlatLine', $family, 0, $em, (P $textX ($base - $ascent + $stroke / 2)), [Drawing.StringFormat]::GenericTypographic)
+$title = New-Object Drawing.Drawing2D.GraphicsPath
+$title.AddString('FlatLine', $family, 0, 110, (P 0 0), [Drawing.StringFormat]::GenericTypographic)
+$tb = $title.GetBounds()
+$m = New-Object Drawing.Drawing2D.Matrix
+$m.Translate([single]($markBounds.X + $markBounds.Width / 2 - $tb.X - $tb.Width / 2), [single]($markBounds.Bottom + 34 - $tb.Y))
+$title.Transform($m)
+$tb = $title.GetBounds()
+$logoBounds = [Drawing.RectangleF]::Union($markBounds, $tb)
 
-$pad = 30
-$markLeft = 70 - $stroke; $markTop = $cy - $r - $stroke; $markRight = 400 + $stroke; $markBottom = $base + $stroke
-$wb = $word.GetBounds()
+function Draw-Logo($g, [Drawing.Color]$ink) {
+    Draw-Mark $g $ink 18
+    $g.FillPath((New-Object Drawing.SolidBrush $ink), $title)
+}
 
-function Save-Png([string]$file, [single]$left, [single]$top, [single]$right, [single]$bottom, [Drawing.Color]$ink, [bool]$withText) {
-    $w = [int]($right - $left + 2 * $pad); $h = [int]($bottom - $top + 2 * $pad)
-    $bmp = New-Object Drawing.Bitmap $w, $h
+# Vykreslí obsah tak, aby obdélník $src vyplnil $fill podílu plátna a byl vystředěný.
+function Fit($g, [Drawing.RectangleF]$src, [int]$size, [single]$fill) {
+    $scale = $fill * $size / [Math]::Max($src.Width, $src.Height)
+    $g.TranslateTransform([single]($size / 2), [single]($size / 2))
+    $g.ScaleTransform($scale, $scale)
+    $g.TranslateTransform([single](-$src.X - $src.Width / 2), [single](-$src.Y - $src.Height / 2))
+    return $scale
+}
+
+function New-Tile([int]$size, [bool]$withTitle) {
+    $bmp = New-Object Drawing.Bitmap $size, $size
     $g = [Drawing.Graphics]::FromImage($bmp)
     $g.SmoothingMode = 'AntiAlias'
     $g.Clear([Drawing.Color]::Transparent)
-    $g.TranslateTransform(-$left + $pad, -$top + $pad)
-    Draw-Mark $g $ink
-    if ($withText) { $g.FillPath((New-Object Drawing.SolidBrush $ink), $word) }
-    $bmp.Save((Join-Path $script:dir $file), [Drawing.Imaging.ImageFormat]::Png)
+
+    # Plochá dlaždice s mírně zaoblenými rohy a jemným svislým přechodem (Fluent).
+    $rad = [single]($size * 0.08); $dd = 2 * $rad; $e = [single]($size - 1)
+    $tile = New-Object Drawing.Drawing2D.GraphicsPath
+    $tile.AddArc(0, 0, $dd, $dd, 180, 90); $tile.AddArc($e - $dd, 0, $dd, $dd, 270, 90)
+    $tile.AddArc($e - $dd, $e - $dd, $dd, $dd, 0, 90); $tile.AddArc(0, $e - $dd, $dd, $dd, 90, 90)
+    $tile.CloseFigure()
+    $bg = New-Object Drawing.Drawing2D.LinearGradientBrush (P 0 0), (P 0 $size), $TileTop, $TileBottom
+    $g.FillPath($bg, $tile)
+
+    if ($withTitle) {
+        [void](Fit $g $logoBounds $size 0.72)
+        Draw-Logo $g $Light
+    } else {
+        $scale = Fit $g $markBounds $size 0.88
+        # Na malých velikostech čáru zesílit, aby nezmizela (aspoň ~1,6 px).
+        Draw-Mark $g $Light ([Math]::Max(18, 1.6 / $scale))
+    }
+    $g.Dispose()
+    return $bmp
+}
+
+function To-Png($bmp) { $ms = New-Object IO.MemoryStream; $bmp.Save($ms, [Drawing.Imaging.ImageFormat]::Png); return , $ms.ToArray() }
+
+$dir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+# Logo na průhledném pozadí.
+foreach ($v in @(@('logo-dark.png', $Light), @('logo-light.png', $Dark))) {
+    $pad = 24
+    $w = [int]($logoBounds.Width + 2 * $pad); $h = [int]($logoBounds.Height + 2 * $pad)
+    $bmp = New-Object Drawing.Bitmap $w, $h
+    $g = [Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = 'AntiAlias'
+    $g.TranslateTransform([single](-$logoBounds.X + $pad), [single](-$logoBounds.Y + $pad))
+    Draw-Logo $g $v[1]
+    $bmp.Save((Join-Path $dir $v[0]), [Drawing.Imaging.ImageFormat]::Png)
     $g.Dispose(); $bmp.Dispose()
 }
 
-$script:dir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$light = [Drawing.Color]::FromArgb(0xF4, 0xF4, 0xF5)
-$dark = [Drawing.Color]::FromArgb(0x1E, 0x1F, 0x22)
-$allTop = [Math]::Min($markTop, $wb.Top); $allBottom = [Math]::Max($markBottom, $wb.Bottom)
-Save-Png 'logo-dark.png'  $markLeft $allTop $wb.Right $allBottom $light $true
-Save-Png 'logo-light.png' $markLeft $allTop $wb.Right $allBottom $dark  $true
-Save-Png 'mark-dark.png'  $markLeft $markTop $markRight $markBottom $light $false
-Save-Png 'mark-light.png' $markLeft $markTop $markRight $markBottom $dark  $false
+# Dlaždice s nadpisem.
+(New-Tile 512 $true).Save((Join-Path $dir 'tile.png'), [Drawing.Imaging.ImageFormat]::Png)
+
+# Ikona: dlaždice bez nadpisu, ICO = hlavička, adresář položek, PNG data za sebou.
+$sizes = 16, 24, 32, 48, 64, 256
+$pngs = foreach ($s in $sizes) { , (To-Png (New-Tile $s $false)) }
+[IO.File]::WriteAllBytes((Join-Path $dir 'icon.png'), $pngs[-1])
+$out = New-Object IO.MemoryStream
+$w = New-Object IO.BinaryWriter $out
+$w.Write([uint16]0); $w.Write([uint16]1); $w.Write([uint16]$sizes.Count)
+$offset = 6 + 16 * $sizes.Count
+for ($i = 0; $i -lt $sizes.Count; $i++) {
+    $dim = if ($sizes[$i] -ge 256) { 0 } else { $sizes[$i] }
+    $w.Write([byte]$dim); $w.Write([byte]$dim); $w.Write([byte]0); $w.Write([byte]0)
+    $w.Write([uint16]1); $w.Write([uint16]32); $w.Write([uint32]$pngs[$i].Length); $w.Write([uint32]$offset)
+    $offset += $pngs[$i].Length
+}
+foreach ($p in $pngs) { $w.Write([byte[]]$p) }
+$w.Flush()
+[IO.File]::WriteAllBytes((Join-Path $dir 'icon.ico'), $out.ToArray())
 'hotovo'
