@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _timer;
     private readonly HashSet<string> _attentionSeen = new();
     private readonly TitleIndex _titles = new();
+    private readonly ContextMeter _context = new();
 
     public MainWindow()
     {
@@ -84,7 +85,12 @@ public partial class MainWindow : Window
                 if (s == null) continue;
                 // Ručně pojmenovaná session z levého panelu má přednost před názvem složky.
                 if (_titles.Lookup(s.Session_id) is { } title) s.Name = title;
-                sessions.Add(new SessionView(s, file) { AppLink = _titles.AppLink(s.Session_id) });
+                sessions.Add(new SessionView(s, file)
+                {
+                    AppLink = _titles.AppLink(s.Session_id),
+                    ContextTokens = string.IsNullOrEmpty(s.Transcript) ? null : _context.Read(s.Transcript),
+                    ContextLimit = _state.ContextLimit,
+                });
             }
             catch { /* soubor se právě zapisuje, načte se při další změně */ }
         }
@@ -171,6 +177,7 @@ public partial class MainWindow : Window
     {
         _state.CounterResetAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         _state.Save();
+        e.Handled = true;
         Reload();
     }
 
@@ -183,6 +190,37 @@ public partial class MainWindow : Window
             _state.Pins.Remove(v.Status.Session_id);
             _state.Save();
         }
+        e.Handled = true;
+    }
+
+    private static readonly long[] ContextLimits = { 100_000, 150_000, 200_000, 300_000, 500_000, 1_000_000 };
+
+    private void Bar_RightClick(object sender, MouseButtonEventArgs e)
+    {
+        // Jen volné místo lišty; položky a záložka Hotovo mají vlastní pravý klik, tlačítka ho ignorují.
+        for (var d = e.OriginalSource as DependencyObject; d != null; d = VisualTreeHelper.GetParent(d))
+            if (d is System.Windows.Controls.Primitives.ButtonBase) return;
+
+        var menu = new System.Windows.Controls.ContextMenu();
+        menu.Items.Add(new System.Windows.Controls.MenuItem { Header = "Plná čára kontextu při", IsEnabled = false });
+        foreach (var limit in ContextLimits)
+        {
+            var item = new System.Windows.Controls.MenuItem
+            {
+                Header = SessionView.FormatTokens(limit) + " tokenů",
+                IsCheckable = true,
+                IsChecked = limit == _state.ContextLimit,
+            };
+            item.Click += (_, _) =>
+            {
+                _state.ContextLimit = limit;
+                _state.Save();
+                Reload();
+            };
+            menu.Items.Add(item);
+        }
+        menu.IsOpen = true;
+        e.Handled = true;
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
@@ -195,6 +233,7 @@ public sealed class SessionStatus
     public string Cwd { get; set; } = "";
     public string State { get; set; } = "done";
     public string Message { get; set; } = "";
+    public string Transcript { get; set; } = "";
     public long Updated { get; set; }
 }
 
@@ -209,7 +248,37 @@ public sealed class SessionView
     private static readonly Brush LightText = Freeze(Color.FromRgb(0xEE, 0xEE, 0xEE));
     private static readonly Brush DarkText = Freeze(Color.FromRgb(0x1E, 0x1F, 0x22));
 
+    private static readonly Brush LineLight = Freeze(Color.FromArgb(0xA0, 0xFF, 0xFF, 0xFF));
+    private static readonly Brush LineDark = Freeze(Color.FromArgb(0x90, 0x1E, 0x1F, 0x22));
+    private static readonly Brush LineYellow = Freeze(Color.FromRgb(0xFA, 0xCC, 0x15));
+    private static readonly Brush LineYellowOnYellow = Freeze(Color.FromRgb(0x85, 0x4D, 0x0E));
+    private static readonly Brush LineRed = Freeze(Color.FromRgb(0xEF, 0x44, 0x44));
+
     public string? AppLink { get; init; }
+    public long? ContextTokens { get; init; }
+    public long ContextLimit { get; init; } = 150_000;
+
+    // Zaplnění kontextu jako tenká čára na spodní hraně položky; plná šířka = limit.
+    private double ContextFraction => Math.Clamp((double)(ContextTokens ?? 0) / Math.Max(1, ContextLimit), 0, 1);
+    public GridLength ContextFilled => new(ContextFraction, GridUnitType.Star);
+    public GridLength ContextRest => new(1 - ContextFraction, GridUnitType.Star);
+    public Visibility ContextVisibility => ContextTokens is > 0 ? Visibility.Visible : Visibility.Collapsed;
+    public Brush ContextBrush
+    {
+        get
+        {
+            // Na žluté položce (pozornost) by žlutá čára splynula, proto tmavší odstín.
+            bool onYellow = Status.State == "attention";
+            return ContextMeter.Level(ContextTokens ?? 0, ContextLimit) switch
+            {
+                ContextLevel.Over => LineRed,
+                ContextLevel.Warning => onYellow ? LineYellowOnYellow : LineYellow,
+                _ => onYellow ? LineDark : LineLight,
+            };
+        }
+    }
+
+    public static string FormatTokens(long n) => n >= 1_000_000 ? $"{n / 1_000_000.0:0.#}M" : $"{n / 1000}k";
 
     public SessionView(SessionStatus status, string file)
     {
@@ -247,7 +316,8 @@ public sealed class SessionView
         {
             var state = Status.State switch { "running" => "běží", "attention" => "potřebuje pozornost", _ => "hotovo" };
             var msg = string.IsNullOrEmpty(Status.Message) ? "" : "\n" + Status.Message;
-            return $"{state}\n{Status.Cwd}{msg}\n(pravý klik = odebrat)";
+            var ctx = ContextTokens is { } t ? $"\nkontext {FormatTokens(t)} / {FormatTokens(ContextLimit)}" : "";
+            return $"{state}{ctx}\n{Status.Cwd}{msg}\n(pravý klik = odebrat)";
         }
     }
 

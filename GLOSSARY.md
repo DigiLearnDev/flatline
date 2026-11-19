@@ -88,3 +88,17 @@ _Avoid_: week, dlouhý limit
 **Ukazatel limitu**:
 Pruh s procenty, kolik z okna je vyčerpáno; od 70 % oranžový, od 90 % červený.
 _Avoid_: progressbar, graf
+
+## Kontext
+
+**Zaplnění kontextu**:
+Kolik tokenů má session právě v kontextu: vstupní tokeny včetně cache u poslední odpovědi hlavního agenta. Subagenti se nepočítají, mají vlastní kontext.
+_Avoid_: spotřeba tokenů (to je součet za celou session), usage
+
+**Čára kontextu**:
+Tenká čára na spodní hraně položky, jejíž délka ukazuje zaplnění kontextu vůči hranici kontextu. Od hranice −10 % je žlutá, nad hranicí červená.
+_Avoid_: progressbar, ukazatel limitu (to je pruh limitu vpravo)
+
+**Hranice kontextu**:
+Počet tokenů, při kterém je čára kontextu plná (výchozí 150k). Mění se pravým klikem na volné místo lišty.
+_Avoid_: limit kontextu (Limit je část předplatného)
