@@ -1,78 +1,87 @@
-# Vykreslí logo FlatLine: nápis, kde tečku nad „i“ nahrazuje čtyřcípá AI hvězdička.
-# Výstup: assets/logo-dark.png (světlý text pro tmavé pozadí) a assets/logo-light.png.
+# Vykreslí logo FlatLine: značku „A✦i“ a vedle ní nápis.
+# Značka je jedna plochá čára (flatline): zleva vyskočí „A“, uprostřed se zvedne
+# do čtyřcípé AI hvězdy jako tep na EKG a vpravo skončí písmenem „i“.
+# Výstup: assets/logo-dark.png (světlé pro tmavé pozadí), assets/logo-light.png
+# a samotná značka assets/mark-dark.png, assets/mark-light.png.
 # Použití: powershell -NoProfile -File assets/make-logo.ps1
 Add-Type -AssemblyName System.Drawing
 
-$text = 'FlatL' + [char]0x0131 + 'ne'   # ı = i bez tečky
-$iIndex = 5
-$em = 200
-$family = New-Object Drawing.FontFamily 'Segoe UI Semibold'
-$font = New-Object Drawing.Font $family, $em, ([Drawing.FontStyle]::Regular), ([Drawing.GraphicsUnit]::Pixel)
-$fmt = [Drawing.StringFormat]::GenericTypographic
-$origin = New-Object Drawing.PointF 40, 40
+function P([single]$x, [single]$y) { New-Object Drawing.PointF $x, $y }
 
-# Tvar nápisu.
-$word = New-Object Drawing.Drawing2D.GraphicsPath
-$word.AddString($text, $family, 0, $em, $origin, $fmt)
+$base = 240        # výška ploché čáry
+$stroke = 18
 
-# Kde leží „ı“: vodorovně podle rozsahu znaku, svisle podle horní hrany jeho glyfu.
-$tmp = New-Object Drawing.Bitmap 10, 10
-$tg = [Drawing.Graphics]::FromImage($tmp)
-$fmtR = $fmt.Clone()
-$fmtR.SetMeasurableCharacterRanges([Drawing.CharacterRange[]]@((New-Object Drawing.CharacterRange $iIndex, 1)))
-$layout = New-Object Drawing.RectangleF $origin.X, $origin.Y, 4000, 1000
-$iRect = $tg.MeasureCharacterRanges($text, $font, $layout, $fmtR)[0].GetBounds($tg)
-$iPath = New-Object Drawing.Drawing2D.GraphicsPath
-$iPath.AddString([string][char]0x0131, $family, 0, $em, $origin, $fmt)
-$iTop = $iPath.GetBounds().Top
+# --- Značka (souřadnice podle skici) ---
 
-# Glyf „ı“ uvnitř svého rozsahu: střed svislého tahu.
-$iGlyph = New-Object Drawing.Drawing2D.GraphicsPath
-$iGlyph.AddString([string][char]0x0131, $family, 0, $em, (New-Object Drawing.PointF $iRect.X, $origin.Y), $fmt)
-$gb = $iGlyph.GetBounds()
-$cx = $gb.X + $gb.Width / 2
+# Čára: A, rovně k hvězdě, za hvězdou rovně k „i“ a nahoru do jeho dříku.
+$line = New-Object Drawing.Drawing2D.GraphicsPath
+$line.AddLines([Drawing.PointF[]]@((P 70 $base), (P 118 172), (P 166 $base), (P 262 $base)))
+$line.StartFigure()
+$line.AddLines([Drawing.PointF[]]@((P 262 $base), (P 400 $base), (P 400 178)))
+$crossbar = New-Object Drawing.Drawing2D.GraphicsPath
+$crossbar.AddLine((P 96 210), (P 140 210))
 
-# Čtyřcípá hvězdička se zaoblenými prohlubněmi (jako u Gemini).
-$r = $em * 0.17
-$cy = $iTop - $r * 0.55 - $em * 0.06
-$k = $r * 0.2
+# Hvězda: dolní cíp sedí na čáře. Prohnuté strany = Bézierovy křivky s řídicími body u středu.
+$cx = 262; $cy = 165; $r = 75; $k = 14
 $star = New-Object Drawing.Drawing2D.GraphicsPath
-$pts = @(
-    @(($cx), ($cy - $r)), @(($cx + $k), ($cy - $k)), @(($cx + $k), ($cy - $k)), @(($cx + $r), ($cy)),
-    @(($cx + $k), ($cy + $k)), @(($cx + $k), ($cy + $k)), @(($cx), ($cy + $r)),
-    @(($cx - $k), ($cy + $k)), @(($cx - $k), ($cy + $k)), @(($cx - $r), ($cy)),
-    @(($cx - $k), ($cy - $k)), @(($cx - $k), ($cy - $k)), @(($cx), ($cy - $r))
-)
-$bez = [Drawing.PointF[]]($pts | ForEach-Object { New-Object Drawing.PointF ([single]$_[0]), ([single]$_[1]) })
-$star.AddBeziers($bez)
+$star.AddBeziers([Drawing.PointF[]]@(
+    (P $cx ($cy + $r)), (P ($cx - $k) ($cy + $k)), (P ($cx - $k) ($cy + $k)), (P ($cx - $r) $cy),
+    (P ($cx - $k) ($cy - $k)), (P ($cx - $k) ($cy - $k)), (P $cx ($cy - $r)),
+    (P ($cx + $k) ($cy - $k)), (P ($cx + $k) ($cy - $k)), (P ($cx + $r) $cy),
+    (P ($cx + $k) ($cy + $k)), (P ($cx + $k) ($cy + $k)), (P $cx ($cy + $r))
+))
 $star.CloseFigure()
 
-# Ořez na obsah.
-$b1 = $word.GetBounds(); $b2 = $star.GetBounds()
-$pad = 24
-$left = [Math]::Floor([Math]::Min($b1.Left, $b2.Left)) - $pad
-$top = [Math]::Floor([Math]::Min($b1.Top, $b2.Top)) - $pad
-$w = [int]([Math]::Ceiling([Math]::Max($b1.Right, $b2.Right)) - $left + $pad)
-$h = [int]([Math]::Ceiling([Math]::Max($b1.Bottom, $b2.Bottom)) - $top + $pad)
+$dot = @(400, 138, 13)   # tečka nad „i“: x, y, poloměr
 
-$dir = Split-Path -Parent $MyInvocation.MyCommand.Path
-foreach ($variant in @(@('logo-dark.png', [Drawing.Color]::FromArgb(0xF4, 0xF4, 0xF5)), @('logo-light.png', [Drawing.Color]::FromArgb(0x1E, 0x1F, 0x22)))) {
-    $bmp = New-Object Drawing.Bitmap $w, $h
-    $g = [Drawing.Graphics]::FromImage($bmp)
-    $g.SmoothingMode = 'AntiAlias'
-    $g.Clear([Drawing.Color]::Transparent)
-    $g.TranslateTransform(-$left, -$top)
-    $g.FillPath((New-Object Drawing.SolidBrush $variant[1]), $word)
+function Draw-Mark($g, [Drawing.Color]$ink) {
+    $pen = New-Object Drawing.Pen $ink, $stroke
+    $pen.StartCap = 'Round'; $pen.EndCap = 'Round'; $pen.LineJoin = 'Round'
+    $g.DrawPath($pen, $line)
+    $g.DrawPath($pen, $crossbar)
+    $g.FillEllipse((New-Object Drawing.SolidBrush $ink), [single]($dot[0] - $dot[2]), [single]($dot[1] - $dot[2]), [single](2 * $dot[2]), [single](2 * $dot[2]))
 
-    # Hvězdička s přechodem modrá → fialová → růžová.
-    $grad = New-Object Drawing.Drawing2D.LinearGradientBrush ((New-Object Drawing.PointF ($cx - $r), ($cy - $r))), ((New-Object Drawing.PointF ($cx + $r), ($cy + $r))), ([Drawing.Color]::FromArgb(0x42, 0x85, 0xF4)), ([Drawing.Color]::FromArgb(0xD9, 0x65, 0x70))
+    $grad = New-Object Drawing.Drawing2D.LinearGradientBrush (P ($cx - $r) ($cy - $r)), (P ($cx + $r) ($cy + $r)), ([Drawing.Color]::Blue), ([Drawing.Color]::Red)
     $blend = New-Object Drawing.Drawing2D.ColorBlend 3
     $blend.Colors = @([Drawing.Color]::FromArgb(0x42, 0x85, 0xF4), [Drawing.Color]::FromArgb(0x9B, 0x72, 0xCB), [Drawing.Color]::FromArgb(0xD9, 0x65, 0x70))
     $blend.Positions = @(0.0, 0.5, 1.0)
     $grad.InterpolationColors = $blend
-    $g.FillPath($grad, $star)
+    $spen = New-Object Drawing.Pen $grad, $stroke
+    $spen.LineJoin = 'Round'
+    $g.DrawPath($spen, $star)
+}
 
-    $bmp.Save((Join-Path $dir $variant[0]), [Drawing.Imaging.ImageFormat]::Png)
+# --- Nápis, účaří zarovnané s plochou čárou ---
+$em = 190
+$family = New-Object Drawing.FontFamily 'Segoe UI Semibold'
+$ascent = $family.GetCellAscent([Drawing.FontStyle]::Regular) / $family.GetEmHeight([Drawing.FontStyle]::Regular) * $em
+$textX = 470
+$word = New-Object Drawing.Drawing2D.GraphicsPath
+$word.AddString('FlatLine', $family, 0, $em, (P $textX ($base - $ascent + $stroke / 2)), [Drawing.StringFormat]::GenericTypographic)
+
+$pad = 30
+$markLeft = 70 - $stroke; $markTop = $cy - $r - $stroke; $markRight = 400 + $stroke; $markBottom = $base + $stroke
+$wb = $word.GetBounds()
+
+function Save-Png([string]$file, [single]$left, [single]$top, [single]$right, [single]$bottom, [Drawing.Color]$ink, [bool]$withText) {
+    $w = [int]($right - $left + 2 * $pad); $h = [int]($bottom - $top + 2 * $pad)
+    $bmp = New-Object Drawing.Bitmap $w, $h
+    $g = [Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = 'AntiAlias'
+    $g.Clear([Drawing.Color]::Transparent)
+    $g.TranslateTransform(-$left + $pad, -$top + $pad)
+    Draw-Mark $g $ink
+    if ($withText) { $g.FillPath((New-Object Drawing.SolidBrush $ink), $word) }
+    $bmp.Save((Join-Path $script:dir $file), [Drawing.Imaging.ImageFormat]::Png)
     $g.Dispose(); $bmp.Dispose()
 }
-"logo: $w x $h"
+
+$script:dir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$light = [Drawing.Color]::FromArgb(0xF4, 0xF4, 0xF5)
+$dark = [Drawing.Color]::FromArgb(0x1E, 0x1F, 0x22)
+$allTop = [Math]::Min($markTop, $wb.Top); $allBottom = [Math]::Max($markBottom, $wb.Bottom)
+Save-Png 'logo-dark.png'  $markLeft $allTop $wb.Right $allBottom $light $true
+Save-Png 'logo-light.png' $markLeft $allTop $wb.Right $allBottom $dark  $true
+Save-Png 'mark-dark.png'  $markLeft $markTop $markRight $markBottom $light $false
+Save-Png 'mark-light.png' $markLeft $markTop $markRight $markBottom $dark  $false
+'hotovo'
