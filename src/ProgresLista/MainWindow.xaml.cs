@@ -19,7 +19,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _timer;
     private readonly HashSet<string> _attentionSeen = new();
     private readonly TitleIndex _titles = new();
-    private readonly ContextMeter _context = new();
+    private readonly TranscriptReader _transcripts = new();
 
     public MainWindow()
     {
@@ -85,10 +85,14 @@ public partial class MainWindow : Window
                 if (s == null) continue;
                 // Ručně pojmenovaná session z levého panelu má přednost před názvem složky.
                 if (_titles.Lookup(s.Session_id) is { } title) s.Name = title;
+                var transcript = TranscriptOf(s) is { } t ? _transcripts.Read(t) : null;
+                // Nový tah, o kterém hook neví (např. umbrellu probudila zpráva od subsession), znamená „běží“.
+                if (transcript != null)
+                    s.State = TranscriptReader.LiveState(s.State, s.Updated, transcript, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
                 sessions.Add(new SessionView(s, file)
                 {
                     AppLink = _titles.AppLink(s.Session_id),
-                    ContextTokens = TranscriptOf(s) is { } t ? _context.Read(t) : null,
+                    ContextTokens = transcript?.ContextTokens,
                     ContextBoundary = _state.ContextBoundary,
                 });
             }

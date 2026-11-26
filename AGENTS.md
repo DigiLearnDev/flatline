@@ -13,7 +13,7 @@ Windows AppBar (C#, WPF, .NET 9) ukazující stav sessions Claude Code a 5h/týd
 - `src/ProgresLista/AppBar.cs` – registrace AppBaru (`SHAppBarMessage`), souřadnice ve fyzických pixelech (manifest PerMonitorV2).
 - `src/ProgresLista/MainWindow.xaml(.cs)` – lišta, načítání stavů, špendlíky, záložky Hotovo a Running, sloupec subsessions.
 - `src/ProgresLista/BarLayout.cs` – čistá logika rozdělení lišty: připnuté, pozornost, záložky, umbrelly a jejich souhrnný stav, počítadla.
-- `src/ProgresLista/ContextMeter.cs` – zaplnění kontextu z transkriptu `.jsonl` (čte jen přírůstky) a úroveň čáry kontextu (normální / žlutá / červená); štětce vybírá `SessionView`.
+- `src/ProgresLista/TranscriptReader.cs` – čte transkript `.jsonl` po přírůstcích: zaplnění kontextu a rozpracovaný tah (session, kterou probudila zpráva, běží, i když hook hlásil hotovo). `ContextMeter` určuje úroveň čáry kontextu; štětce vybírá `SessionView`.
 - `src/ProgresLista/TitleIndex.cs` – názvy sessions a vazba na umbrellu z metadat desktop aplikace (`cliSessionId` → `title`, `spawnedFrom`).
 - `src/ProgresLista/UsageClient.cs` – limity z `/api/oauth/usage`, obnova OAuth tokenu.
 - `src/ProgresLista/BarState.cs` – připnutí, počítadlo a hranice kontextu (`~/.claude/progres-lista-state.json`).
