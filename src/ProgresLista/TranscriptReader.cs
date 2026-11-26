@@ -21,9 +21,10 @@ public static class ContextMeter
 
 /// <summary>Co lišta vyčte z transkriptu session.</summary>
 /// <param name="ContextTokens">Zaplnění kontextu: vstupní tokeny (včetně cache) poslední odpovědi hlavního agenta.</param>
-/// <param name="OpenTurnSince">Kdy začal rozpracovaný tah (ms od epochy); null, když session na nic nepracuje.</param>
+/// <param name="TurnOpen">Session má rozpracovaný tah: poslední záznam je pokyn, zpráva od subsession,
+/// výsledek nástroje nebo odpověď, která volá nástroj.</param>
 /// <param name="LastActivity">Čas posledního záznamu hlavního agenta nebo uživatele (ms od epochy).</param>
-public sealed record TranscriptInfo(long? ContextTokens, long? OpenTurnSince, long? LastActivity);
+public sealed record TranscriptInfo(long? ContextTokens, bool TurnOpen, long? LastActivity);
 
 /// <summary>
 /// Čte transkript Claude Code (.jsonl). Transkript jen roste, proto se pamatuje, kam se dočetlo,
@@ -31,31 +32,35 @@ public sealed record TranscriptInfo(long? ContextTokens, long? OpenTurnSince, lo
 /// </summary>
 public sealed class TranscriptReader
 {
-    /// <summary>Rozpracovaný tah bez nového záznamu déle než tohle se považuje za opuštěný (např. lokální příkaz bez odpovědi).</summary>
-    public const long StaleTurnMs = 10 * 60 * 1000;
+    /// <summary>
+    /// Rozpracovaný tah bez nového záznamu déle než tohle se považuje za opuštěný (session ukončená
+    /// uprostřed tahu). Je dlouhý, aby ho nepřekročil ani dlouho běžící nástroj, např. verify.
+    /// </summary>
+    public const long StaleTurnMs = 60 * 60 * 1000;
 
     /// <summary>Kolik bajtů z konce transkriptu se přečte poprvé (celé transkripty mají i desítky MB).</summary>
-    public const long FirstReadTailBytes = 2 * 1024 * 1024;
+    public const long FirstReadTailBytes = 4 * 1024 * 1024;
 
     private sealed class Cursor
     {
         public long Offset;          // konec posledního celého řádku
         public long? Tokens;
-        public long? OpenSince;
+        public bool TurnOpen;
         public long? LastActivity;
-        public TranscriptInfo Info => new(Tokens, OpenSince, LastActivity);
+        public TranscriptInfo Info => new(Tokens, TurnOpen, LastActivity);
     }
 
     private readonly Dictionary<string, Cursor> _cursors = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Stav session pro lištu. Hook hlásí „hotovo“ na konci tahu, ale o novém tahu se dozvědět nemusí:
-    /// umbrellu probudí zpráva od subsession a ona pracuje dál. Když po posledním hlášení hooku začal
-    /// v transkriptu nový tah a není opuštěný, session běží.
+    /// Stav session pro lištu. Hook hlásí „hotovo“ na konci tahu, ale o dalším tahu se dozvědět nemusí:
+    /// umbrellu probudí zpráva od subsession a ona pracuje dál (verify, merge). Hook také hlásí
+    /// „hotovo“ při auto-compactu uprostřed tahu. Když má session rozpracovaný tah a po posledním
+    /// hlášení hooku v něm přibyl záznam, session běží.
     /// </summary>
     public static string LiveState(string hookState, long hookUpdated, TranscriptInfo t, long now) =>
-        hookState == "done" && t.OpenTurnSince is { } since && since > hookUpdated
-            && t.LastActivity is { } last && now - last < StaleTurnMs
+        hookState == "done" && t.TurnOpen
+            && t.LastActivity is { } last && last > hookUpdated && now - last < StaleTurnMs
             ? "running" : hookState;
 
     public TranscriptInfo Read(string path)
@@ -92,7 +97,7 @@ public sealed class TranscriptReader
             {
                 if (bytes[i] != (byte)'\n') continue;
                 if (skipFirstLine) skipFirstLine = false;
-                else Apply(c, Encoding.UTF8.GetString(bytes, start, i - start));
+                else ReadEntry(c, Encoding.UTF8.GetString(bytes, start, i - start));
                 start = i + 1;
             }
             c.Offset += start;
@@ -102,7 +107,7 @@ public sealed class TranscriptReader
         catch (UnauthorizedAccessException) { return c.Info; }
     }
 
-    private static void Apply(Cursor c, string line)
+    private static void ReadEntry(Cursor c, string line)
     {
         // Rychlé síto: zajímají nás jen zprávy uživatele a hlavního agenta.
         bool assistant = line.Contains("\"type\":\"assistant\"");
@@ -112,37 +117,47 @@ public sealed class TranscriptReader
             using var doc = JsonDocument.Parse(line);
             var root = doc.RootElement;
             if (root.ValueKind != JsonValueKind.Object) return;
-            if (root.TryGetProperty("isSidechain", out var side) && side.ValueKind == JsonValueKind.True) return;
-            if (root.TryGetProperty("isMeta", out var meta) && meta.ValueKind == JsonValueKind.True) return;
+            bool Flag(string name) => root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.True;
+            // Subagenti, systémové vložky a shrnutí po compactu nejsou tah session.
+            if (Flag("isSidechain") || Flag("isMeta") || Flag("isCompactSummary")) return;
             var type = root.TryGetProperty("type", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() : null;
             if (type is not ("assistant" or "user")) return;
             if (!root.TryGetProperty("message", out var msg) || msg.ValueKind != JsonValueKind.Object) return;
 
-            long? at = root.TryGetProperty("timestamp", out var ts) && ts.ValueKind == JsonValueKind.String
-                && DateTimeOffset.TryParse(ts.GetString(), out var dt) ? dt.ToUnixTimeMilliseconds() : null;
-            if (at != null) c.LastActivity = at;
+            if (type == "assistant" && msg.TryGetProperty("usage", out var u) && u.ValueKind == JsonValueKind.Object)
+            {
+                long Get(string name) => u.TryGetProperty(name, out var v) && v.TryGetInt64(out var n) ? n : 0;
+                c.Tokens = Get("input_tokens") + Get("cache_creation_input_tokens") + Get("cache_read_input_tokens");
+            }
 
             if (type == "assistant")
             {
-                if (msg.TryGetProperty("usage", out var u) && u.ValueKind == JsonValueKind.Object)
-                {
-                    long Get(string name) => u.TryGetProperty(name, out var v) && v.TryGetInt64(out var n) ? n : 0;
-                    c.Tokens = Get("input_tokens") + Get("cache_creation_input_tokens") + Get("cache_read_input_tokens");
-                }
+                // Odpověď, která volá nástroj, tah nechává otevřený; jakákoli jiná ho uzavírá.
                 var stop = msg.TryGetProperty("stop_reason", out var sr) && sr.ValueKind == JsonValueKind.String ? sr.GetString() : null;
-                if (stop is "end_turn" or "stop_sequence" or "max_tokens") c.OpenSince = null;   // odpověď je hotová
-                else if (stop != null) c.OpenSince ??= at;                                      // tool_use: tah pokračuje
+                if (stop == null) return;   // rozepsaná odpověď nic nemění
+                c.TurnOpen = stop is "tool_use" or "pause_turn";
             }
-            else if (IsInterruption(msg)) c.OpenSince = null;
-            else c.OpenSince ??= at;   // nový pokyn, zpráva od subsession nebo výsledek nástroje
+            else
+            {
+                var text = FirstText(msg);
+                // Lokální příkazy (/model, /compact…) model nespouští, tah nezačínají.
+                if (text != null && (text.StartsWith("<command-name>", StringComparison.Ordinal)
+                    || text.StartsWith("<local-command-", StringComparison.Ordinal))) return;
+                c.TurnOpen = text?.StartsWith("[Request interrupted", StringComparison.Ordinal) != true;
+            }
+
+            if (root.TryGetProperty("timestamp", out var ts) && ts.ValueKind == JsonValueKind.String
+                && DateTimeOffset.TryParse(ts.GetString(), out var dt))
+                c.LastActivity = dt.ToUnixTimeMilliseconds();
         }
         catch (JsonException) { }
     }
 
-    private static bool IsInterruption(JsonElement msg)
+    /// <summary>Text zprávy uživatele (řetězec nebo první textový blok); null u výsledku nástroje.</summary>
+    private static string? FirstText(JsonElement msg)
     {
-        if (!msg.TryGetProperty("content", out var content)) return false;
-        string? text = content.ValueKind switch
+        if (!msg.TryGetProperty("content", out var content)) return null;
+        return content.ValueKind switch
         {
             JsonValueKind.String => content.GetString(),
             JsonValueKind.Array => content.EnumerateArray()
@@ -150,6 +165,5 @@ public sealed class TranscriptReader
                 .Select(b => b.GetProperty("text").GetString()).FirstOrDefault(),
             _ => null,
         };
-        return text?.StartsWith("[Request interrupted", StringComparison.Ordinal) == true;
     }
 }

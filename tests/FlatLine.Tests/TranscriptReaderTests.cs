@@ -81,12 +81,12 @@ public sealed class TranscriptReaderTests
 
     // --- Rozpracovaný tah ---
 
-    private static string Line(string time, string type, string body, bool side = false) =>
-        $"{{\"type\":\"{type}\",\"isSidechain\":{(side ? "true" : "false")},\"timestamp\":\"2026-11-26T{time}.000Z\",\"message\":{body}}}\n";
+    private static string Line(string time, string type, string body, bool side = false, string extra = "") =>
+        $"{{\"type\":\"{type}\",\"isSidechain\":{(side ? "true" : "false")},{extra}\"timestamp\":\"2026-11-26T{time}.000Z\",\"message\":{body}}}\n";
     private static string Reply(string time, string stop) =>
         Line(time, "assistant", $"{{\"role\":\"assistant\",\"stop_reason\":\"{stop}\",\"content\":[]}}");
-    private static string Prompt(string time, string text) =>
-        Line(time, "user", $"{{\"role\":\"user\",\"content\":\"{text}\"}}");
+    private static string Prompt(string time, string text, string extra = "") =>
+        Line(time, "user", $"{{\"role\":\"user\",\"content\":\"{text}\"}}", extra: extra);
     private static string ToolResult(string time) =>
         Line(time, "user", "{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\"}]}");
     private static long Ms(string time) => DateTimeOffset.Parse($"2026-11-26T{time}Z").ToUnixTimeMilliseconds();
@@ -97,7 +97,9 @@ public sealed class TranscriptReaderTests
         File.WriteAllText(_path, Prompt("10:00:00", "ahoj") + Reply("10:00:05", "end_turn") +
             "{\"type\":\"system\",\"subtype\":\"stop_hook_summary\",\"timestamp\":\"2026-11-26T10:00:06.000Z\"}\n");
 
-        Assert.IsNull(new TranscriptReader().Read(_path).OpenTurnSince);
+        var info = new TranscriptReader().Read(_path);
+        Assert.IsFalse(info.TurnOpen);
+        Assert.AreEqual(Ms("10:00:05"), info.LastActivity);
     }
 
     [TestMethod]
@@ -106,7 +108,9 @@ public sealed class TranscriptReaderTests
         // Umbrellu probudí zpráva od subsession; hook se o tom dozvědět nemusí.
         File.WriteAllText(_path, Reply("10:00:05", "end_turn") + Prompt("10:01:00", "The session finished"));
 
-        Assert.AreEqual(Ms("10:01:00"), new TranscriptReader().Read(_path).OpenTurnSince);
+        var info = new TranscriptReader().Read(_path);
+        Assert.IsTrue(info.TurnOpen);
+        Assert.AreEqual(Ms("10:01:00"), info.LastActivity);
     }
 
     [TestMethod]
@@ -114,10 +118,23 @@ public sealed class TranscriptReaderTests
     {
         var reader = new TranscriptReader();
         File.WriteAllText(_path, Prompt("10:00:00", "udelej to") + Reply("10:00:03", "tool_use"));
-        Assert.AreEqual(Ms("10:00:00"), reader.Read(_path).OpenTurnSince);
+        Assert.IsTrue(reader.Read(_path).TurnOpen);
 
         File.AppendAllText(_path, ToolResult("10:00:09") + Reply("10:00:12", "end_turn"));
-        Assert.IsNull(reader.Read(_path).OpenTurnSince);
+        Assert.IsFalse(reader.Read(_path).TurnOpen);
+    }
+
+    [TestMethod]
+    public void Any_final_reply_closes_the_turn_so_the_next_message_counts_again()
+    {
+        var reader = new TranscriptReader();
+        File.WriteAllText(_path, Prompt("10:00:00", "udelej to") + Reply("10:00:03", "refusal"));
+        Assert.IsFalse(reader.Read(_path).TurnOpen);
+
+        File.AppendAllText(_path, Prompt("10:05:00", "The session finished"));
+        var info = reader.Read(_path);
+        Assert.IsTrue(info.TurnOpen);
+        Assert.AreEqual(Ms("10:05:00"), info.LastActivity);
     }
 
     [TestMethod]
@@ -126,7 +143,20 @@ public sealed class TranscriptReaderTests
         File.WriteAllText(_path, Prompt("10:00:00", "udelej to") + Reply("10:00:03", "tool_use") +
             Prompt("10:00:04", "[Request interrupted by user]"));
 
-        Assert.IsNull(new TranscriptReader().Read(_path).OpenTurnSince);
+        Assert.IsFalse(new TranscriptReader().Read(_path).TurnOpen);
+    }
+
+    [TestMethod]
+    public void Local_commands_and_compaction_summary_are_not_a_turn()
+    {
+        File.WriteAllText(_path, Reply("10:00:05", "end_turn") +
+            Prompt("10:01:00", "<command-name>/model</command-name>") +
+            Prompt("10:01:01", "<local-command-stdout>Set model</local-command-stdout>") +
+            Prompt("10:02:00", "This session is being continued", extra: "\"isCompactSummary\":true,"));
+
+        var info = new TranscriptReader().Read(_path);
+        Assert.IsFalse(info.TurnOpen);
+        Assert.AreEqual(Ms("10:00:05"), info.LastActivity);
     }
 
     [TestMethod]
@@ -134,26 +164,26 @@ public sealed class TranscriptReaderTests
     {
         File.WriteAllText(_path, Reply("10:00:05", "end_turn") + Line("10:00:09", "user", "{\"role\":\"user\",\"content\":\"x\"}", side: true));
 
-        Assert.IsNull(new TranscriptReader().Read(_path).OpenTurnSince);
+        Assert.IsFalse(new TranscriptReader().Read(_path).TurnOpen);
     }
 
     [TestMethod]
-    [DataRow("done", 1000L, 2000L, "running")]       // tah začal po posledním hlášení hooku
-    [DataRow("done", 3000L, 2000L, "done")]          // otevřený tah je starší než „hotovo“ z hooku
-    [DataRow("done", 1000L, null, "done")]           // žádný otevřený tah
-    [DataRow("attention", 1000L, 2000L, "attention")]
-    [DataRow("running", 1000L, null, "running")]
-    public void Hook_done_turns_running_when_a_newer_turn_is_open(string hook, long hookUpdated, long? openSince, string expected)
+    [DataRow("done", 1000L, true, "running")]       // tah pracuje i po posledním hlášení hooku (probuzení, auto-compact)
+    [DataRow("done", 3000L, true, "done")]          // od hlášení „hotovo“ se v transkriptu nic nestalo
+    [DataRow("done", 1000L, false, "done")]         // tah je uzavřený
+    [DataRow("attention", 1000L, true, "attention")]
+    [DataRow("running", 1000L, false, "running")]
+    public void Hook_done_turns_running_while_an_open_turn_keeps_working(string hook, long hookUpdated, bool open, string expected)
     {
-        var info = new TranscriptInfo(null, openSince, openSince);
+        var info = new TranscriptInfo(null, open, LastActivity: 2000);
         Assert.AreEqual(expected, TranscriptReader.LiveState(hook, hookUpdated, info, now: 2500));
     }
 
     [TestMethod]
     public void Abandoned_open_turn_does_not_keep_the_session_running()
     {
-        // Např. lokální příkaz, na který model nikdy neodpověděl.
-        var info = new TranscriptInfo(null, OpenTurnSince: 2000, LastActivity: 2000);
+        // Např. session ukončená uprostřed tahu.
+        var info = new TranscriptInfo(null, TurnOpen: true, LastActivity: 2000);
         Assert.AreEqual("done", TranscriptReader.LiveState("done", 1000, info, now: 2000 + TranscriptReader.StaleTurnMs));
     }
 
