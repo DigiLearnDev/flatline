@@ -11,9 +11,10 @@ Windows AppBar (C#, WPF, .NET 9) ukazující stav sessions Claude Code a 5h/týd
 ## Struktura
 
 - `src/ProgresLista/AppBar.cs` – registrace AppBaru (`SHAppBarMessage`), souřadnice ve fyzických pixelech (manifest PerMonitorV2).
-- `src/ProgresLista/MainWindow.xaml(.cs)` – lišta, načítání stavů, špendlíky, záložka Hotovo.
+- `src/ProgresLista/MainWindow.xaml(.cs)` – lišta, načítání stavů, špendlíky, záložky Hotovo a Running, sloupec subsessions.
+- `src/ProgresLista/BarLayout.cs` – čistá logika rozdělení lišty: připnuté, pozornost, záložky, umbrelly a jejich souhrnný stav, počítadla.
 - `src/ProgresLista/ContextMeter.cs` – zaplnění kontextu z transkriptu `.jsonl` (čte jen přírůstky) a úroveň čáry kontextu (normální / žlutá / červená); štětce vybírá `SessionView`.
-- `src/ProgresLista/TitleIndex.cs` – názvy sessions z metadat desktop aplikace (`cliSessionId` → `title`).
+- `src/ProgresLista/TitleIndex.cs` – názvy sessions a vazba na umbrellu z metadat desktop aplikace (`cliSessionId` → `title`, `spawnedFrom`).
 - `src/ProgresLista/UsageClient.cs` – limity z `/api/oauth/usage`, obnova OAuth tokenu.
 - `src/ProgresLista/BarState.cs` – připnutí, počítadlo a hranice kontextu (`~/.claude/progres-lista-state.json`).
 - `hooks/progres-hook.js` – hook: zapisuje `~/.claude/progres-lista/<session_id>.json`. Nesmí nic vypsat na stdout (výstup `UserPromptSubmit` jde do kontextu) a vždy končí kódem 0.

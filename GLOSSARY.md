@@ -8,8 +8,13 @@ Lišta na horním okraji obrazovky, která na první pohled ukazuje, jestli něk
 Pruh přes celou šířku horního okraje obrazovky, který si od systému vyhradí místo jako hlavní panel, takže ho okna nepřekrývají.
 _Avoid_: panel, toolbar, AppBar (to je jen technika, kterou lišta používá)
 
-**Souhrn**:
-Text na levém okraji lišty s počtem sessions, které běží a které čekají.
+**Část Připnuté**:
+Levá část lišty za záložkami se všemi připnutými sessions.
+_Avoid_: oblíbené, pinned
+
+**Část Pozornost**:
+Pravá část lišty, oddělená od Připnutých svislou čarou, se všemi nepřipnutými sessions, které potřebují pozornost (i subsessions).
+_Avoid_: fronta, needs attention
 
 **Bliknutí**:
 Krátké rozsvícení a zhasnutí celé lišty, když přibude nová session nebo když session přejde do stavu hotovo či potřebuje pozornost.
@@ -45,6 +50,18 @@ _Avoid_: čeká, blokovaná, attention
 Stav session, která dokončila práci a čeká na další zadání. Zelená položka s modrým puntíkem.
 _Avoid_: done, idle, nečinná
 
+**Umbrella**:
+Session, která spustila další sessions (dispečer). V záložce ukazuje počet subsessions a šipku; po najetí myší se vpravo rozbalí sloupec s nimi. Je hotová, jen když jsou nečinné i všechny její subsessions; jinak je šedá.
+_Avoid_: rodič, dispečer, orchestrátor
+
+**Subsession**:
+Session, kterou spustila jiná session na liště (podle `spawnedFrom` v metadatech desktop aplikace). Vnořené subsessions patří k nejvyšší umbrelle na liště; session odpojená od rodiče (`lineageDetached`) stojí sama.
+_Avoid_: dítě, podřízená session, side session
+
+**Volně stojící session**:
+Session, která není umbrellou ani subsession žádné session na liště.
+_Avoid_: samostatná, osamocená
+
 **Odebrání**:
 Ruční odstranění položky z lišty, typicky u session, která skončila, aniž by to lišta poznala.
 _Avoid_: smazání, zavření session
@@ -56,19 +73,27 @@ Přepínač u položky, který session připne; připnutý je bíle vyplněný.
 _Avoid_: pin, oblíbené
 
 **Připnutá session**:
-Session, která je vždy vlevo na liště a nikdy nespadne do záložky Hotovo.
+Session, která je vždy v části Připnuté a nikdy nespadne do záložky Hotovo ani Running.
 _Avoid_: oblíbená, sledovaná
 
 **Záložka Hotovo**:
-Sbalené místo na liště, kam spadnou nepřipnuté sessions, které jsou hotové déle než 10 minut.
+Sbalené místo na liště s hotovými umbrellami a volně stojícími sessions, které nejsou připnuté. Session sem spadne hned, jak doběhne.
 _Avoid_: archiv, koš, seznam hotových
 
+**Záložka Running**:
+Sbalené místo na liště s umbrellami a volně stojícími sessions, které ještě nejsou hotové (kromě těch v části Pozornost a připnutých).
+_Avoid_: běžící, seznam běžících
+
 **Počítadlo**:
-Číslo na záložce Hotovo: kolik sessions do ní spadlo od posledního vynulování.
+Číslo na záložce: kolik položek je v jejím seznamu.
 _Avoid_: badge, čítač
 
+**Nové**:
+Modrý odznak u záložky Hotovo: kolik položek v ní doběhlo od posledního vynulování.
+_Avoid_: nepřečtené, badge
+
 **Vynulování**:
-Pravý klik na záložku Hotovo, po kterém počítadlo začne počítat znovu od nuly; sessions v záložce zůstanou.
+Pravý klik na záložku Hotovo, po kterém odznak Nové zmizí a počítá znovu od nuly; sessions v záložce zůstanou.
 _Avoid_: reset, smazání
 
 ## Limity
