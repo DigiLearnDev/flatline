@@ -19,8 +19,11 @@ Několik orchestračních agentů Claude zpracovává tickety z GitHubu. Větši
 - **Stav každé session:** šedý puntík běží, žlutá položka potřebuje pozornost (se zvukem), zelená položka s modrým puntíkem je hotová. Při každé změně stavu lišta krátce blikne.
 - **Klik na session** ji otevře v desktop aplikaci Claude (sessions z CLI odkaz nemají).
 - **Názvy z levého panelu** desktop aplikace Claude. Sessions z CLI mají název složky.
-- **Špendlík:** připnuté sessions jsou vždy vlevo a nikdy se neschovají.
-- **Záložka Hotovo:** sem spadnou nepřipnuté sessions hotové déle než 10 minut. Klik ukáže seznam, pravý klik vynuluje počítadlo.
+- **Rozdělení lišty:** vlevo záložky **Hotovo** a **Running**, za nimi připnuté sessions a za svislou čarou sessions, které potřebují pozornost.
+- **Špendlík:** připnuté sessions jsou vždy v části připnutých a nikdy se neschovají do záložek.
+- **Záložka Hotovo:** sem spadne každá nepřipnutá hotová session. Číslo = kolik jich je v seznamu, modrý odznak = kolik doběhlo od vynulování (pravý klik).
+- **Záložka Running:** nepřipnuté sessions, které ještě pracují.
+- **Umbrelly:** session, která spustila další sessions, je v záložce jedna položka s počtem subsessions. Najetí myší rozbalí vpravo sloupec se subsessions. Umbrella je hotová, až když jsou nečinné i všechny subsessions; subsession, která potřebuje pozornost, je rovnou na liště.
 - **Zaplnění kontextu:** tenká čára na spodní hraně položky. Plná čára = hranice kontextu (výchozí 150k tokenů), od hranice −10 % je žlutá, nad hranicí červená. Hranici změníš pravým klikem na volné místo lišty. Přesný počet je v tooltipu.
 - **Limity:** ukazatele 5h a týdenního okna, modré / od 70 % oranžové / od 90 % červené.
 - Pravý klik na session ji odebere z lišty (např. když skončila bez `SessionEnd`).
@@ -42,7 +45,7 @@ Odinstalace hooků: `node hooks/install.js --remove`.
 ## Jak to funguje
 
 - Hooky Claude Code (`hooks/progres-hook.js`) zapisují stav každé session do `~/.claude/progres-lista/<session_id>.json`. Lišta složku sleduje.
-- Názvy čte z metadat desktop aplikace v `%LOCALAPPDATA%\Claude-Data`. Není to veřejné rozhraní, po aktualizaci aplikace se může změnit; lišta pak ukáže název složky.
+- Názvy a vazby umbrella → subsession (`spawnedFrom`, `lineageDetached`) čte z metadat desktop aplikace v `%LOCALAPPDATA%\Claude-Data`. Není to veřejné rozhraní, po aktualizaci aplikace se může změnit; lišta pak ukáže název složky.
 - Limity čte z `api.anthropic.com/api/oauth/usage` tokenem z `~/.claude/.credentials.json`. Prošlý token obnoví a uloží zpět. Token jde jen na Anthropic.
 - Zaplnění kontextu čte z transkriptu session (`~/.claude/projects/…/<session_id>.jsonl`), jehož cestu zapisuje hook. Čte jen nové řádky. Formát transkriptu není veřejné rozhraní; když se změní, čára se neukáže.
 - Připnutí, počítadlo a hranice kontextu jsou v `~/.claude/progres-lista-state.json`.

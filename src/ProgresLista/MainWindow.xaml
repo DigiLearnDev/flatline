@@ -6,11 +6,11 @@
         Topmost="True" Background="#1E1F22" FontFamily="Segoe UI" FontSize="12"
         MouseRightButtonUp="Bar_RightClick">
     <Window.Resources>
-        <!-- Jedna položka session; používá se v liště i v rozbalené záložce Hotovo. -->
+        <!-- Jedna položka session; používá se na liště, v záložkách Hotovo a Running i v seznamu subsessions. -->
         <DataTemplate x:Key="SessionItem">
             <Border Background="{Binding Background}" CornerRadius="4" Margin="0,0,6,4"
                     ToolTip="{Binding Tooltip}" Cursor="Hand"
-                    MouseLeftButtonUp="Item_Click" MouseRightButtonUp="Item_RightClick">
+                    MouseLeftButtonUp="Item_Click" MouseRightButtonUp="Item_RightClick" MouseEnter="Item_MouseEnter">
                 <Grid>
                 <StackPanel Orientation="Horizontal" Margin="6,2,8,2">
                     <!-- Vyplněný glyf nemá špičku, proto se pod obrys (se špičkou) kreslí výplň. -->
@@ -23,6 +23,12 @@
                     </Grid>
                     <Ellipse Width="8" Height="8" Fill="{Binding Dot}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding Label}" Foreground="{Binding Foreground}" VerticalAlignment="Center"/>
+                    <!-- Umbrella: počet subsessions a šipka ke sloupci, který se rozbalí po najetí myší. -->
+                    <TextBlock Text="{Binding UmbrellaBadge}" Visibility="{Binding UmbrellaVisibility}"
+                               Foreground="{Binding Foreground}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    <TextBlock Text="&#xE76C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="9"
+                               Visibility="{Binding UmbrellaVisibility}" Foreground="{Binding Foreground}"
+                               VerticalAlignment="Center" Margin="3,1,0,0"/>
                 </StackPanel>
                 <!-- Zaplnění kontextu: celá šířka = hranice kontextu (pravý klik na lištu). Odsazení drží čáru mimo zaoblené rohy. -->
                 <Grid VerticalAlignment="Bottom" Height="1" Margin="3,0" Visibility="{Binding ContextVisibility}"
@@ -36,6 +42,14 @@
                 </Grid>
             </Border>
         </DataTemplate>
+
+        <Style x:Key="ListPanel" TargetType="Border">
+            <Setter Property="Background" Value="#1E1F22"/>
+            <Setter Property="BorderBrush" Value="#3F3F46"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="6,6,0,2"/>
+        </Style>
     </Window.Resources>
     <Grid>
     <DockPanel LastChildFill="True" Margin="8,0">
@@ -49,23 +63,75 @@
             <ProgressBar x:Name="WeekBar" Width="60" Height="6" Maximum="100" Background="#2B2D31" BorderThickness="0"/>
             <TextBlock x:Name="WeekText" Foreground="#DDD" Width="34" Margin="4,0,0,0" VerticalAlignment="Center"/>
         </StackPanel>
-        <TextBlock x:Name="Summary" DockPanel.Dock="Left" Foreground="#DDD" FontWeight="SemiBold"
-                   VerticalAlignment="Center" Margin="0,0,12,0"/>
+
+        <!-- Záložka Hotovo: počet v seznamu + modrý odznak s novými od vynulování. -->
         <Border x:Name="DoneChip" DockPanel.Dock="Left" Background="#14532D" CornerRadius="4" Padding="8,2"
-                Margin="0,0,12,0" VerticalAlignment="Center" Cursor="Hand"
-                ToolTip="Hotové nepřipnuté sessions (idle přes 10 min). Klik = seznam, pravý klik = vynulovat počítadlo."
+                Margin="0,0,6,0" VerticalAlignment="Center" Cursor="Hand"
+                ToolTip="Hotové sessions. Klik = seznam, pravý klik = vynulovat odznak Nové (modrý)."
                 MouseLeftButtonUp="DoneChip_Click" MouseRightButtonUp="DoneChip_RightClick">
-            <TextBlock x:Name="DoneText" Foreground="#EEE"/>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock x:Name="DoneText" Foreground="#EEE" VerticalAlignment="Center"/>
+                <Border x:Name="DoneNewBadge" Background="#3B82F6" CornerRadius="7" Padding="5,0" Margin="6,0,0,0"
+                        VerticalAlignment="Center">
+                    <TextBlock x:Name="DoneNewText" Foreground="White" FontSize="10" FontWeight="SemiBold"/>
+                </Border>
+            </StackPanel>
         </Border>
         <Popup x:Name="DonePopup" PlacementTarget="{Binding ElementName=DoneChip}" Placement="Bottom"
-               StaysOpen="False" AllowsTransparency="True">
-            <Border Background="#1E1F22" BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="4" Padding="6,6,0,2">
-                <ScrollViewer MaxHeight="400" VerticalScrollBarVisibility="Auto">
-                    <ItemsControl x:Name="DoneItems" ItemTemplate="{StaticResource SessionItem}"/>
-                </ScrollViewer>
-            </Border>
+               StaysOpen="False" AllowsTransparency="True" Closed="TabPopup_Closed">
+            <Grid>
+                <Border Style="{StaticResource ListPanel}">
+                    <ScrollViewer MaxHeight="400" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="DoneItems" ItemTemplate="{StaticResource SessionItem}"/>
+                    </ScrollViewer>
+                </Border>
+                <!-- Sloupec subsessions; je uvnitř záložky, aby klik do něj záložku nezavřel. -->
+                <Popup x:Name="DoneChildPopup" Placement="Right" StaysOpen="True" AllowsTransparency="True">
+                    <Border Style="{StaticResource ListPanel}" Margin="2,0,0,0">
+                        <ScrollViewer MaxHeight="400" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl x:Name="DoneChildItems" ItemTemplate="{StaticResource SessionItem}"/>
+                        </ScrollViewer>
+                    </Border>
+                </Popup>
+            </Grid>
         </Popup>
-        <ItemsControl x:Name="Items" VerticalAlignment="Center" Margin="0,4,0,0"
+
+        <!-- Záložka Running: umbrelly a volně stojící sessions, které ještě nejsou hotové. -->
+        <Border x:Name="RunningChip" DockPanel.Dock="Left" Background="#3F3F46" CornerRadius="4" Padding="8,2"
+                Margin="0,0,12,0" VerticalAlignment="Center" Cursor="Hand"
+                ToolTip="Sessions, které ještě nejsou hotové. Klik = seznam."
+                MouseLeftButtonUp="RunningChip_Click" MouseRightButtonUp="RunningChip_RightClick">
+            <TextBlock x:Name="RunningText" Foreground="#EEE"/>
+        </Border>
+        <Popup x:Name="RunningPopup" PlacementTarget="{Binding ElementName=RunningChip}" Placement="Bottom"
+               StaysOpen="False" AllowsTransparency="True" Closed="TabPopup_Closed">
+            <Grid>
+                <Border Style="{StaticResource ListPanel}">
+                    <ScrollViewer MaxHeight="400" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="RunningItems" ItemTemplate="{StaticResource SessionItem}"/>
+                    </ScrollViewer>
+                </Border>
+                <Popup x:Name="RunningChildPopup" Placement="Right" StaysOpen="True" AllowsTransparency="True">
+                    <Border Style="{StaticResource ListPanel}" Margin="2,0,0,0">
+                        <ScrollViewer MaxHeight="400" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl x:Name="RunningChildItems" ItemTemplate="{StaticResource SessionItem}"/>
+                        </ScrollViewer>
+                    </Border>
+                </Popup>
+            </Grid>
+        </Popup>
+
+        <!-- 1. část: připnuté sessions. -->
+        <ItemsControl x:Name="PinnedItems" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,4,0,0"
+                      ItemTemplate="{StaticResource SessionItem}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+        </ItemsControl>
+        <Rectangle DockPanel.Dock="Left" Width="1" Height="18" Fill="#4B4D52" Margin="6,0,12,0"
+                   VerticalAlignment="Center" SnapsToDevicePixels="True"/>
+        <!-- 2. část: sessions, které potřebují pozornost. -->
+        <ItemsControl x:Name="AttentionItems" VerticalAlignment="Center" Margin="0,4,0,0"
                       ItemTemplate="{StaticResource SessionItem}">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>

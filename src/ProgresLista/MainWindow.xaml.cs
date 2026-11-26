@@ -113,29 +113,36 @@ public partial class MainWindow : Window
 
         foreach (var s in sessions) s.Pinned = _state.Pins.Contains(s.Status.Session_id);
 
-        // Nepřipnuté hotové sessions, které jsou idle přes 10 minut, jdou do záložky Hotovo.
-        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        bool InDone(SessionView s) => !s.Pinned && s.Status.State == "done" && now - s.Status.Updated > DoneAfterMs;
-        var doneTab = sessions.Where(InDone).OrderByDescending(s => s.Status.Updated).ToList();
+        // Vazby umbrella → subsession z metadat desktop aplikace. Session patří k nejbližší session
+        // v řetězci spuštění, která je na liště (i když prostřední session z lišty zmizela).
+        var views = sessions.GroupBy(s => s.Status.Session_id).ToDictionary(g => g.Key, g => g.First());
+        string? ParentOf(string id) => _titles.SpawnChain(id)
+            .Select(ids => ids.FirstOrDefault(views.ContainsKey)).FirstOrDefault(x => x != null);
+        var layout = BarLayout.Build(
+            views.Values.Select(v => new SessionNode(v.Status.Session_id, v.Status.State, v.Status.Updated, ParentOf(v.Status.Session_id))),
+            _state.Pins, _state.CounterResetAt);
 
-        Items.ItemsSource = sessions.Where(s => !InDone(s))
-            .OrderBy(s => s.Pinned ? 0 : 1)
-            .ThenBy(s => s.Status.State switch { "attention" => 0, "running" => 1, _ => 2 })
-            .ThenBy(s => s.Status.Name)
-            .ToList();
-        DoneItems.ItemsSource = doneTab;
+        List<SessionView> ViewsOf(IEnumerable<SessionNode> nodes) =>
+            nodes.Select(n => views[n.Id]).OrderBy(v => v.Status.Name).ToList();
+        SessionView OnBar(SessionGroup g) => views[g.Root.Id].ForGroup(g, ViewsOf(g.Children), inTab: false);
+        SessionView InTab(SessionGroup g) => views[g.Root.Id].ForGroup(g, ViewsOf(g.Children), inTab: true);
 
-        // Počítadlo = kolik sessions do záložky spadlo od posledního vynulování.
-        int fresh = doneTab.Count(s => s.Status.Updated + DoneAfterMs > _state.CounterResetAt);
-        DoneText.Text = fresh > 0 ? $"Hotovo  {fresh}" : "Hotovo";
-        DoneChip.Opacity = doneTab.Count > 0 ? 1 : 0.5;
+        PinnedItems.ItemsSource = layout.Pinned.Select(OnBar).OrderBy(v => v.Status.Name).ToList();
+        AttentionItems.ItemsSource = ViewsOf(layout.Attention);
+        RunningItems.ItemsSource = layout.Running.Select(InTab).ToList();
+        DoneItems.ItemsSource = layout.Done.Select(InTab).ToList();
+        RefreshChildPopup(DoneChildPopup, DoneChildItems, DoneItems);
+        RefreshChildPopup(RunningChildPopup, RunningChildItems, RunningItems);
 
-        int run = sessions.Count(s => s.Status.State == "running");
-        int att = sessions.Count(s => s.Status.State == "attention");
-        Summary.Text = $"běží {run}  ·  čeká {att}";
+        // Hotovo ukazuje, kolik je v seznamu; modrý odznak, kolik jich doběhlo od vynulování.
+        DoneText.Text = $"Hotovo  {layout.Done.Count}";
+        DoneNewText.Text = layout.DoneNew.ToString();
+        DoneNewBadge.Visibility = layout.DoneNew > 0 ? Visibility.Visible : Visibility.Collapsed;
+        DoneChip.Opacity = layout.Done.Count > 0 ? 1 : 0.5;
+        RunningText.Text = $"Running  {layout.Running.Count}";
+        RunningChip.Opacity = layout.Running.Count > 0 ? 1 : 0.5;
     }
 
-    private const long DoneAfterMs = 10 * 60 * 1000;
     private readonly BarState _state = BarState.Load();
 
     private Dictionary<string, string>? _lastStates;
@@ -159,7 +166,51 @@ public partial class MainWindow : Window
             try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(link) { UseShellExecute = true }); }
             catch { }
             DonePopup.IsOpen = false;
+            RunningPopup.IsOpen = false;
         }
+    }
+
+    private void RunningChip_Click(object sender, MouseButtonEventArgs e) => RunningPopup.IsOpen = !RunningPopup.IsOpen;
+
+    private void RunningChip_RightClick(object sender, MouseButtonEventArgs e) => e.Handled = true;
+
+    /// <summary>Najetí na umbrellu v rozbalené záložce otevře vpravo sloupec s jejími subsessions.</summary>
+    private void Item_MouseEnter(object sender, MouseEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is not SessionView { ShowsChildrenOnHover: true } v) return;
+        var (popup, items) = DoneItems.Items.Contains(v) ? (DoneChildPopup, DoneChildItems) : (RunningChildPopup, RunningChildItems);
+        if (v.Children.Count == 0) { popup.IsOpen = false; return; }
+        items.ItemsSource = v.Children;
+        popup.PlacementTarget = (UIElement)sender;
+        popup.Tag = v.Status.Session_id;
+        popup.IsOpen = true;
+    }
+
+    /// <summary>Po obnovení záložky ukáže otevřený sloupec čerstvé subsessions téže umbrelly, nebo se zavře.</summary>
+    private static void RefreshChildPopup(System.Windows.Controls.Primitives.Popup popup,
+        System.Windows.Controls.ItemsControl items, System.Windows.Controls.ItemsControl tab)
+    {
+        if (!popup.IsOpen) return;
+        var v = tab.Items.OfType<SessionView>().FirstOrDefault(x => x.Status.Session_id == (string?)popup.Tag);
+        if (v == null || v.Children.Count == 0) { popup.IsOpen = false; return; }
+        items.ItemsSource = v.Children;
+        // Položky záložky vznikly znovu; sloupec se po vykreslení přichytí k nové položce umbrelly.
+        tab.Dispatcher.BeginInvoke(() =>
+        {
+            if (tab.ItemContainerGenerator.ContainerFromItem(v) is FrameworkElement c && c.IsVisible)
+            {
+                popup.PlacementTarget = c;
+                popup.HorizontalOffset += 0.01;   // přinutí Popup přepočítat polohu
+                popup.HorizontalOffset -= 0.01;
+            }
+            else popup.IsOpen = false;
+        }, System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    private void TabPopup_Closed(object? sender, EventArgs e)
+    {
+        DoneChildPopup.IsOpen = false;
+        RunningChildPopup.IsOpen = false;
     }
 
     private void Pin_Click(object sender, MouseButtonEventArgs e)
@@ -284,7 +335,7 @@ public sealed class SessionView
         get
         {
             // Na žluté položce (pozornost) by žlutá čára splynula, proto tmavší odstín.
-            bool onYellow = Status.State == "attention";
+            bool onYellow = State == "attention";
             return ContextMeter.Level(ContextTokens ?? 0, ContextBoundary) switch
             {
                 ContextLevel.Over => LineRed,
@@ -300,7 +351,33 @@ public sealed class SessionView
     {
         Status = status;
         File = file;
+        State = status.State;
+        Updated = status.Updated;
     }
+
+    /// <summary>Stav, podle kterého se položka barví; u umbrelly souhrnný stav celé skupiny.</summary>
+    public string State { get; private init; }
+    /// <summary>Poslední změna; u umbrelly poslední změna v celé skupině.</summary>
+    public long Updated { get; private init; }
+    public IReadOnlyList<SessionView> Children { get; private init; } = Array.Empty<SessionView>();
+    /// <summary>Položka v rozbalené záložce: najetí myší ukáže subsessions.</summary>
+    public bool ShowsChildrenOnHover { get; private init; }
+    public string UmbrellaBadge => Children.Count.ToString();
+    public Visibility UmbrellaVisibility => Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>Položka za celou skupinu: barva a čas podle souhrnu, v záložce navíc subsessions po najetí myší.</summary>
+    public SessionView ForGroup(SessionGroup g, IReadOnlyList<SessionView> children, bool inTab) =>
+        new(Status, File)
+        {
+            AppLink = AppLink,
+            ContextTokens = ContextTokens,
+            ContextBoundary = ContextBoundary,
+            Pinned = Pinned,
+            State = g.State switch { SessionState.Attention => "attention", SessionState.Running => "running", _ => "done" },
+            Updated = g.Updated,
+            Children = children,
+            ShowsChildrenOnHover = inTab,
+        };
 
     public SessionStatus Status { get; }
     public string File { get; }
@@ -313,15 +390,15 @@ public sealed class SessionView
     public Brush PinForeground => Pinned ? Brushes.White : Foreground;
 
     // Hotovo = modrý puntík jako v aplikaci Claude, běží = šedý.
-    public Brush Dot => Status.State switch { "running" => Gray, "attention" => DarkOrange, _ => Blue };
-    public Brush Background => Status.State switch { "attention" => AttentionBg, "done" => DoneBg, _ => ItemBg };
-    public Brush Foreground => Status.State == "attention" ? DarkText : LightText;
+    public Brush Dot => State switch { "running" => Gray, "attention" => DarkOrange, _ => Blue };
+    public Brush Background => State switch { "attention" => AttentionBg, "done" => DoneBg, _ => ItemBg };
+    public Brush Foreground => State == "attention" ? DarkText : LightText;
 
     public string Label
     {
         get
         {
-            var mins = (int)(DateTimeOffset.UtcNow - DateTimeOffset.FromUnixTimeMilliseconds(Status.Updated)).TotalMinutes;
+            var mins = (int)(DateTimeOffset.UtcNow - DateTimeOffset.FromUnixTimeMilliseconds(Updated)).TotalMinutes;
             return mins < 1 ? Status.Name : $"{Status.Name} · {mins} min";
         }
     }
@@ -330,7 +407,8 @@ public sealed class SessionView
     {
         get
         {
-            var state = Status.State switch { "running" => "běží", "attention" => "potřebuje pozornost", _ => "hotovo" };
+            var state = State switch { "running" => "běží", "attention" => "potřebuje pozornost", _ => "hotovo" };
+            if (Children.Count > 0) state = $"umbrella, {Children.Count} subsessions: {state}";
             var msg = string.IsNullOrEmpty(Status.Message) ? "" : "\n" + Status.Message;
             var ctx = ContextTokens is long t and > 0 ? $"\nkontext {FormatTokens(t)} / {FormatTokens(ContextBoundary)}" : "";
             return $"{state}{ctx}\n{Status.Cwd}{msg}\n(pravý klik = odebrat)";
