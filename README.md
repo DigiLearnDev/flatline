@@ -47,6 +47,7 @@ Odinstalace hooků: `node hooks/install.js --remove`.
 - Hooky Claude Code (`hooks/progres-hook.js`) zapisují stav každé session do `~/.claude/progres-lista/<session_id>.json`. Lišta složku sleduje.
 - Názvy a vazby umbrella → subsession (`spawnedFrom`, `lineageDetached`) čte z metadat desktop aplikace v `%LOCALAPPDATA%\Claude-Data`. Není to veřejné rozhraní, po aktualizaci aplikace se může změnit; lišta pak ukáže název složky.
 - Limity čte z `api.anthropic.com/api/oauth/usage` tokenem z `~/.claude/.credentials.json`. Prošlý token obnoví a uloží zpět. Token jde jen na Anthropic.
+- Z transkriptu pozná i rozpracovaný tah: když session po hlášení „hotovo“ začne znovu pracovat a hook se o tom nedozví (typicky umbrellu probudí zpráva od subsession), lišta ji ukáže jako běžící.
 - Zaplnění kontextu čte z transkriptu session (`~/.claude/projects/…/<session_id>.jsonl`), jehož cestu zapisuje hook. Čte jen nové řádky. Formát transkriptu není veřejné rozhraní; když se změní, čára se neukáže.
 - Připnutí, počítadlo a hranice kontextu jsou v `~/.claude/progres-lista-state.json`.
 

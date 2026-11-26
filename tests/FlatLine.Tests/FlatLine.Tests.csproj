@@ -14,7 +14,7 @@
 
   <ItemGroup>
     <!-- Jen čistá logika bez WPF; celý projekt lišty se sem netahá. -->
-    <Compile Include="..\..\src\ProgresLista\ContextMeter.cs" Link="ContextMeter.cs" />
+    <Compile Include="..\..\src\ProgresLista\TranscriptReader.cs" Link="TranscriptReader.cs" />
     <Compile Include="..\..\src\ProgresLista\BarLayout.cs" Link="BarLayout.cs" />
   </ItemGroup>
 
