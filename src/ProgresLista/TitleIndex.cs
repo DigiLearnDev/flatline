@@ -8,7 +8,7 @@ namespace ProgresLista;
 /// Desktop app ukládá metadata do %LOCALAPPDATA%\Claude-Data\*\claude-code-sessions\**\local_*.json
 /// (pole title, cliSessionId, lastAssistantCliSessionId). Soubory se čtou znovu jen při změně.
 /// Z pole spawnedFrom zjistí i umbrellu, která session spustila (kromě sessions, které uživatel
-/// od rodiče odpojil: lineageDetached).
+/// od umbrelly odpojil: lineageDetached).
 /// </summary>
 public sealed class TitleIndex
 {
@@ -16,13 +16,23 @@ public sealed class TitleIndex
     private readonly Dictionary<string, string> _titles = new();
 
     private readonly Dictionary<string, string> _localIds = new();
-    private readonly Dictionary<string, string> _parentLocal = new();      // local id → local id rodiče
+    private readonly Dictionary<string, string> _spawnedBy = new();        // local id → local id session, která ji spustila
     private readonly Dictionary<string, string[]> _cliIdsOfLocal = new();  // local id → jeho CLI ID
 
-    /// <summary>CLI ID umbrelly, která session spustila (může jich být víc, např. po rewindu); prázdné, když žádná není.</summary>
-    public IReadOnlyList<string> ParentCliIds(string cliSessionId) =>
-        _localIds.TryGetValue(cliSessionId, out var l) && _parentLocal.TryGetValue(l, out var p)
-            && _cliIdsOfLocal.TryGetValue(p, out var ids) ? ids : Array.Empty<string>();
+    /// <summary>
+    /// Sessions, které tuto session spustily, od nejbližší po nejvzdálenější; každá jako sada svých CLI ID
+    /// (může jich být víc, např. po rewindu). Prázdné, když session nikdo nespustil.
+    /// </summary>
+    public IEnumerable<string[]> SpawnChain(string cliSessionId)
+    {
+        if (!_localIds.TryGetValue(cliSessionId, out var local)) yield break;
+        var seen = new HashSet<string> { local };
+        while (_spawnedBy.TryGetValue(local, out var up) && seen.Add(up))
+        {
+            local = up;
+            if (_cliIdsOfLocal.TryGetValue(local, out var ids)) yield return ids;
+        }
+    }
 
     /// <summary>Odkaz, který otevře session v desktop aplikaci Claude; null pro sessions z CLI.</summary>
     public string? AppLink(string cliSessionId) =>
@@ -54,13 +64,13 @@ public sealed class TitleIndex
 
         _titles.Clear();
         _localIds.Clear();
-        _parentLocal.Clear();
+        _spawnedBy.Clear();
         _cliIdsOfLocal.Clear();
         foreach (var (file, (_, title, ids, parent)) in _files)
         {
             var local = Path.GetFileNameWithoutExtension(file);
             _cliIdsOfLocal[local] = ids;
-            if (parent != null) _parentLocal[local] = parent;
+            if (parent != null) _spawnedBy[local] = parent;
             foreach (var id in ids)
             {
                 // Název souboru je ID session v desktop aplikaci (local_…), z něj vzniká odkaz.

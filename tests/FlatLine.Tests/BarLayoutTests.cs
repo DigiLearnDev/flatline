@@ -64,6 +64,18 @@ public sealed class BarLayoutTests
     }
 
     [TestMethod]
+    public void Umbrella_on_the_bar_keeps_its_subsessions_reachable_from_its_tab()
+    {
+        var attention = Build(new[] { S("umb", "attention"), S("a", "running", parent: "umb") });
+        CollectionAssert.AreEqual(new[] { "umb" }, attention.Attention.Select(s => s.Id).ToArray());
+        CollectionAssert.AreEqual(new[] { "a" }, attention.Running.Single().Children.Select(c => c.Id).ToArray());
+
+        var pinned = Build(new[] { S("umb", "done"), S("a", "done", parent: "umb") }, "umb");
+        CollectionAssert.AreEqual(new[] { "umb" }, Ids(pinned.Pinned));
+        CollectionAssert.AreEqual(new[] { "a" }, pinned.Done.Single().Children.Select(c => c.Id).ToArray());
+    }
+
+    [TestMethod]
     public void Nested_subsessions_belong_to_the_topmost_umbrella_on_the_bar()
     {
         var layout = Build(new[]
@@ -78,7 +90,7 @@ public sealed class BarLayoutTests
     }
 
     [TestMethod]
-    public void Parent_cycle_does_not_hang()
+    public void Sessions_spawning_each_other_in_a_cycle_do_not_hang()
     {
         var layout = Build(new[] { S("x", "running", parent: "y"), S("y", "running", parent: "x") });
         Assert.AreEqual(2, layout.Running.Sum(g => 1 + g.Children.Count));

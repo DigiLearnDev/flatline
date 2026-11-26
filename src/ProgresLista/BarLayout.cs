@@ -70,10 +70,13 @@ public sealed record BarLayout(
             .Where(s => !pins.Contains(s.Id) && s.OwnState == SessionState.Attention)
             .OrderBy(s => s.Id).ToList();
 
-        // Do záložek jdou jen kořeny, které nejsou přímo na liště.
+        // Do záložek jdou kořeny. Volně stojící session, která je už na liště (připnutá nebo potřebuje
+        // pozornost), se neopakuje; umbrella v záložce zůstane vždy, jinak by její subsessions nešly najít.
         var tabbed = byId.Values
-            .Where(s => roots[s.Id] == s.Id && !pins.Contains(s.Id) && s.OwnState != SessionState.Attention)
-            .Select(GroupOf).OrderByDescending(g => g.Updated).ToList();
+            .Where(s => roots[s.Id] == s.Id)
+            .Select(GroupOf)
+            .Where(g => g.IsUmbrella || (!pins.Contains(g.Root.Id) && g.Root.OwnState != SessionState.Attention))
+            .OrderByDescending(g => g.Updated).ToList();
         var running = tabbed.Where(g => g.State != SessionState.Done).ToList();
         var done = tabbed.Where(g => g.State == SessionState.Done).ToList();
 

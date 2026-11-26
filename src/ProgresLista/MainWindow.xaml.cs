@@ -113,21 +113,24 @@ public partial class MainWindow : Window
 
         foreach (var s in sessions) s.Pinned = _state.Pins.Contains(s.Status.Session_id);
 
-        // Vazby umbrella → subsession z metadat desktop aplikace; rodič se počítá, jen když je na liště.
+        // Vazby umbrella → subsession z metadat desktop aplikace. Session patří k nejbližší session
+        // v řetězci spuštění, která je na liště (i když prostřední session z lišty zmizela).
         var views = sessions.GroupBy(s => s.Status.Session_id).ToDictionary(g => g.Key, g => g.First());
-        string? ParentOf(string id) => _titles.ParentCliIds(id).FirstOrDefault(views.ContainsKey);
+        string? ParentOf(string id) => _titles.SpawnChain(id)
+            .Select(ids => ids.FirstOrDefault(views.ContainsKey)).FirstOrDefault(x => x != null);
         var layout = BarLayout.Build(
             views.Values.Select(v => new SessionNode(v.Status.Session_id, v.Status.State, v.Status.Updated, ParentOf(v.Status.Session_id))),
             _state.Pins, _state.CounterResetAt);
 
-        List<SessionView> Single(IEnumerable<SessionNode> nodes) =>
+        List<SessionView> ViewsOf(IEnumerable<SessionNode> nodes) =>
             nodes.Select(n => views[n.Id]).OrderBy(v => v.Status.Name).ToList();
-        SessionView Group(SessionGroup g, bool hover) => views[g.Root.Id].ForGroup(g, Single(g.Children), hover);
+        SessionView OnBar(SessionGroup g) => views[g.Root.Id].ForGroup(g, ViewsOf(g.Children), inTab: false);
+        SessionView InTab(SessionGroup g) => views[g.Root.Id].ForGroup(g, ViewsOf(g.Children), inTab: true);
 
-        PinnedItems.ItemsSource = layout.Pinned.Select(g => Group(g, hover: false)).OrderBy(v => v.Status.Name).ToList();
-        AttentionItems.ItemsSource = Single(layout.Attention);
-        RunningItems.ItemsSource = layout.Running.Select(g => Group(g, hover: true)).ToList();
-        DoneItems.ItemsSource = layout.Done.Select(g => Group(g, hover: true)).ToList();
+        PinnedItems.ItemsSource = layout.Pinned.Select(OnBar).OrderBy(v => v.Status.Name).ToList();
+        AttentionItems.ItemsSource = ViewsOf(layout.Attention);
+        RunningItems.ItemsSource = layout.Running.Select(InTab).ToList();
+        DoneItems.ItemsSource = layout.Done.Select(InTab).ToList();
         RefreshChildPopup(DoneChildPopup, DoneChildItems, DoneItems);
         RefreshChildPopup(RunningChildPopup, RunningChildItems, RunningItems);
 
@@ -191,6 +194,17 @@ public partial class MainWindow : Window
         var v = tab.Items.OfType<SessionView>().FirstOrDefault(x => x.Status.Session_id == (string?)popup.Tag);
         if (v == null || v.Children.Count == 0) { popup.IsOpen = false; return; }
         items.ItemsSource = v.Children;
+        // Položky záložky vznikly znovu; sloupec se po vykreslení přichytí k nové položce umbrelly.
+        tab.Dispatcher.BeginInvoke(() =>
+        {
+            if (tab.ItemContainerGenerator.ContainerFromItem(v) is FrameworkElement c && c.IsVisible)
+            {
+                popup.PlacementTarget = c;
+                popup.HorizontalOffset += 0.01;   // přinutí Popup přepočítat polohu
+                popup.HorizontalOffset -= 0.01;
+            }
+            else popup.IsOpen = false;
+        }, System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private void TabPopup_Closed(object? sender, EventArgs e)
@@ -352,7 +366,7 @@ public sealed class SessionView
     public Visibility UmbrellaVisibility => Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
     /// <summary>Položka za celou skupinu: barva a čas podle souhrnu, v záložce navíc subsessions po najetí myší.</summary>
-    public SessionView ForGroup(SessionGroup g, IReadOnlyList<SessionView> children, bool hover) =>
+    public SessionView ForGroup(SessionGroup g, IReadOnlyList<SessionView> children, bool inTab) =>
         new(Status, File)
         {
             AppLink = AppLink,
@@ -362,7 +376,7 @@ public sealed class SessionView
             State = g.State switch { SessionState.Attention => "attention", SessionState.Running => "running", _ => "done" },
             Updated = g.Updated,
             Children = children,
-            ShowsChildrenOnHover = hover,
+            ShowsChildrenOnHover = inTab,
         };
 
     public SessionStatus Status { get; }

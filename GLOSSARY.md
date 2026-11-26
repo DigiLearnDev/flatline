@@ -55,7 +55,7 @@ Session, která spustila další sessions (dispečer). V záložce ukazuje poče
 _Avoid_: rodič, dispečer, orchestrátor
 
 **Subsession**:
-Session, kterou spustila jiná session na liště (podle `spawnedFrom` v metadatech desktop aplikace). Vnořené subsessions patří k nejvyšší umbrelle na liště; session odpojená od rodiče (`lineageDetached`) stojí sama.
+Session, kterou spustila jiná session na liště (podle `spawnedFrom` v metadatech desktop aplikace). Vnořené subsessions patří k nejvyšší umbrelle na liště; session odpojená od umbrelly (`lineageDetached`) stojí sama.
 _Avoid_: dítě, podřízená session, side session
 
 **Volně stojící session**:
@@ -81,7 +81,7 @@ Sbalené místo na liště s hotovými umbrellami a volně stojícími sessions,
 _Avoid_: archiv, koš, seznam hotových
 
 **Záložka Running**:
-Sbalené místo na liště s umbrellami a volně stojícími sessions, které ještě nejsou hotové (kromě těch v části Pozornost a připnutých).
+Sbalené místo na liště s umbrellami a volně stojícími sessions, které ještě nejsou hotové. Volně stojící session, která je připnutá nebo v části Pozornost, se tu neopakuje; umbrella je tu vždy, aby šly najít její subsessions.
 _Avoid_: běžící, seznam běžících
 
 **Počítadlo**:

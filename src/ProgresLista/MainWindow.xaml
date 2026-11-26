@@ -67,7 +67,7 @@
         <!-- Záložka Hotovo: počet v seznamu + modrý odznak s novými od vynulování. -->
         <Border x:Name="DoneChip" DockPanel.Dock="Left" Background="#14532D" CornerRadius="4" Padding="8,2"
                 Margin="0,0,6,0" VerticalAlignment="Center" Cursor="Hand"
-                ToolTip="Hotové sessions. Klik = seznam, pravý klik = vynulovat modré počítadlo nových."
+                ToolTip="Hotové sessions. Klik = seznam, pravý klik = vynulovat odznak Nové (modrý)."
                 MouseLeftButtonUp="DoneChip_Click" MouseRightButtonUp="DoneChip_RightClick">
             <StackPanel Orientation="Horizontal">
                 <TextBlock x:Name="DoneText" Foreground="#EEE" VerticalAlignment="Center"/>
@@ -99,7 +99,7 @@
         <!-- Záložka Running: umbrelly a volně stojící sessions, které ještě nejsou hotové. -->
         <Border x:Name="RunningChip" DockPanel.Dock="Left" Background="#3F3F46" CornerRadius="4" Padding="8,2"
                 Margin="0,0,12,0" VerticalAlignment="Center" Cursor="Hand"
-                ToolTip="Běžící sessions. Klik = seznam."
+                ToolTip="Sessions, které ještě nejsou hotové. Klik = seznam."
                 MouseLeftButtonUp="RunningChip_Click" MouseRightButtonUp="RunningChip_RightClick">
             <TextBlock x:Name="RunningText" Foreground="#EEE"/>
         </Border>
